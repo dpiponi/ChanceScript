@@ -304,28 +304,38 @@ struct Character
 
 void test6()
 {
-  Character player{10};
-  Character monster{10};
+  Character player{6};
+  Character monster{6};
 
     auto r = iterate_all(
       [](const Character& player, const Character& monster)
       {
           return roll(20) >> [=](int player_hit_roll)
           {
-            if (player_hit_roll >= 11)
-            {
-              return roll(6) >> [=](int player_damage)
+            return
+            player_hit_roll >= 11 ?
+              roll(6) >> [=](int player_damage)
               {
-                return certainly_all(player, monster.damage(player_damage));
-              };
-            }
-            else
+                return certainly(monster.damage(player_damage));
+              }
+              :
+              certainly(monster);
+          } >> [=](const Character& monster)
+          {
+            return roll(20) >> [=](int monster_hit_roll)
+            {
+              return monster_hit_roll >= 11 ?
+                roll(6) >> [=](int monster_damage)
+                {
+                  return certainly(player.damage(monster_damage));
+                } : certainly(player);
+            } >> [=](const Character& player)
             {
               return certainly_all(player, monster);
-            }
+            };
           };
       },
-      10,
+      20,
       player, monster
       );
     for (auto z : r.pdf)
