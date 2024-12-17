@@ -284,7 +284,57 @@ void test5()
     }
 }
 
+struct Character
+{
+  int hit_points;
+
+  auto operator<=>(const Character&) const = default; 
+  Character damage(int damage) const
+  {
+    if (damage >= hit_points)
+    {
+      return Character{0};
+    }
+    else
+    {
+      return Character{hit_points - damage};
+    }
+  }
+};
+
+void test6()
+{
+  Character player{10};
+  Character monster{10};
+
+    auto r = iterate_all(
+      [](const Character& player, const Character& monster)
+      {
+          return roll(20) >> [=](int player_hit_roll)
+          {
+            if (player_hit_roll >= 11)
+            {
+              return roll(6) >> [=](int player_damage)
+              {
+                return certainly_all(player, monster.damage(player_damage));
+              };
+            }
+            else
+            {
+              return certainly_all(player, monster);
+            }
+          };
+      },
+      10,
+      player, monster
+      );
+    for (auto z : r.pdf)
+    {
+        std::cout << std::get<0>(z.value).hit_points << ' ' << std::get<1>(z.value).hit_points << ' '<< z.prob << std::endl;
+    }
+}
+
 int main()
 {
-  test5();
+  test6();
 }
