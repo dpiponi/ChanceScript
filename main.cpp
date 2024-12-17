@@ -84,7 +84,20 @@ std::invoke_result_t<F, T> then(const Dist<T> &m, const F& f)
         }
     }
 
-    //std::sort(result.begin(), result.end());
+    sortAndCombine(result.pdf);
+    return result;
+}
+
+template<typename T, typename F>
+Dist<std::invoke_result_t<F, T>> fmap(const Dist<T> &m, const F& f)
+{
+    Dist<std::invoke_result_t<F, T>> result{};
+    for (const auto& x : m.pdf)
+    {
+        auto fx = f(x.value);
+        result.pdf.push_back(Atom{fx, x.prob});
+    }
+
     sortAndCombine(result.pdf);
     return result;
 }
@@ -342,7 +355,51 @@ void test6()
     }
 }
 
+Dist<std::vector<int>> roll_keep(int r, int k)
+{
+  if (r == 0)
+  {
+    return certainly(std::vector<int>{});
+  }
+  else
+  {
+    return roll_keep(r - 1, k) >> [=](const std::vector<int>& rolls)
+    {
+      return roll(6) >> [=](int n)
+      {
+        auto new_rolls = rolls;
+        new_rolls.push_back(n);
+        std::sort(new_rolls.begin(), new_rolls.end());
+        if (new_rolls.size() > k)
+        {
+          new_rolls.resize(k);
+        }
+        return certainly(new_rolls);
+      };
+    };
+  }
+}
+
+int sum(const std::vector<int>& a)
+{
+  int t = 0;
+  for (auto x : a)
+  {
+    t += x;
+  }
+  return t;
+}
+
+void test7()
+{
+  auto r = fmap(roll_keep(8, 4), sum);
+  for (auto z : r.pdf)
+  {
+      std::cout << z.value << ' ' << z.prob << std::endl;
+  }
+}
+
 int main()
 {
-  test6();
+  test7();
 }
