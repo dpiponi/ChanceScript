@@ -302,40 +302,38 @@ struct Character
   }
 };
 
+Dist<Character> attacks(const Character& player, const Character& monster)
+{
+  if (player.hit_points > 0)
+  {
+    return roll(20) >> [=](int player_hit_roll)
+    {
+      return player_hit_roll >= 11 ?
+        roll(6) >> [=](int player_damage) { return certainly(monster.damage(player_damage)); }
+        : certainly(monster);
+    };
+  } else {
+    return certainly(monster);
+  }
+}
+
 void test6()
 {
   Character player{6};
-  Character monster{6};
+  Character monster{100};
 
     auto r = iterate_all(
       [](const Character& player, const Character& monster)
       {
-          return roll(20) >> [=](int player_hit_roll)
+          return attacks(player, monster) >> [=](const Character& monster)
           {
-            return
-            player_hit_roll >= 11 ?
-              roll(6) >> [=](int player_damage)
-              {
-                return certainly(monster.damage(player_damage));
-              }
-              :
-              certainly(monster);
-          } >> [=](const Character& monster)
-          {
-            return roll(20) >> [=](int monster_hit_roll)
-            {
-              return monster_hit_roll >= 11 ?
-                roll(6) >> [=](int monster_damage)
-                {
-                  return certainly(player.damage(monster_damage));
-                } : certainly(player);
-            } >> [=](const Character& player)
+            return attacks(monster, player) >> [=](const Character& player)
             {
               return certainly_all(player, monster);
             };
           };
       },
-      20,
+      100,
       player, monster
       );
     for (auto z : r.pdf)
