@@ -234,11 +234,12 @@ void test3()
 template<typename X, typename F>
 Dist<X> iterate(const X& init, const F& f, int n)
 {
-    if (n == 0)
+    Dist<X> r = certainly(init);
+    for (int i = 0; i < n; ++i)
     {
-        return certainly(init);
+      r = r >> f;
     }
-    return iterate(init, f, n - 1) >> f;
+    return r;
 }
 
 void test4()
@@ -255,6 +256,26 @@ void test4()
       },
       3
       );
+    for (auto z : r.pdf)
+    {
+        std::cout << z.value.x << ' ' << z.value.y << ' ' << z.prob << std::endl;
+    }
+}
+
+void test4a()
+{
+    struct X {int x; int y; auto operator<=>(const X&) const = default; };
+    auto r = certainly(X{0, 0});
+    for (int i = 0; i < 4; ++i)
+    {
+      r = r >> [](const auto& xy)
+        {
+            return roll(6) >> [&xy](int t)
+            {
+              return certainly(X{10 * xy.x + t, 100 * xy.y + t});
+            };
+        };
+    }
     for (auto z : r.pdf)
     {
         std::cout << z.value.x << ' ' << z.value.y << ' ' << z.prob << std::endl;
