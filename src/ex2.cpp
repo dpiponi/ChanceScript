@@ -82,18 +82,18 @@ dist<Prob, X> update_field(const X &x, Y (X::*field), const dist<Prob, Y> &dy)
 ddist<state> player_move(const state &s) {
   auto [player, monster] = s;
   if (player.hit_points > 0 && monster.hit_points > 0) {
-    return roll(20) >> [=](int to_hit) {
+    return roll(20).and_then([=](int to_hit) {
       if (to_hit >= 11) {
-        return roll(6) >> [=](int damage) {
+        return roll(6).and_then([=](int damage) {
           auto damaged_monster = monster;
           damaged_monster.hit_points =
               std::max(0, damaged_monster.hit_points - damage);
           return certainly(state{player, damaged_monster});
-        };
+        });
       } else {
         return certainly(s);
       }
-    };
+    });
   } else {
     return certainly(s);
   }

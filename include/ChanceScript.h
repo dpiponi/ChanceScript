@@ -22,6 +22,9 @@ struct dist;
 template<typename Prob, typename T, typename F>
 std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f);
 
+template<typename Prob, typename T, typename F>
+dist<Prob, std::invoke_result_t<F, T>> fmap(const dist<Prob, T> &m, const F& f);
+
 template<typename Prob, typename T>
 struct dist
 {
@@ -40,6 +43,17 @@ struct dist
         }),
         pdf.end()
     );
+  }
+
+  template<typename F>
+  std::invoke_result_t<F, T> and_then(const F& f)
+  {
+    return then(*this, f);
+  }
+
+  template<typename F>
+  dist<Prob, std::invoke_result_t<F, T>> transform(const dist<Prob, T> &m, const F& f) {
+    return fmap(*this, f);
   }
 
   template<typename F>
