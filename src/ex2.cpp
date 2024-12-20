@@ -63,7 +63,23 @@ struct state
   auto operator<=> (const state&) const = default;
 };
 
-ddist<state> player_move(const state s) {
+template<typename Prob = double, typename X, typename Y>
+dist<Prob, X> update_field(const X &x, Y (X::*field), const dist<Prob, Y> &dy)
+{
+  return dy >> [=](const Y& y) {
+    X x_new = x;
+    x_new.*field = y;
+    return certainly(x_new);
+  };
+}
+
+// template<typename Prob = double, typename F>
+// auto lift(const F& f)
+// {
+//   return [](
+// }
+
+ddist<state> player_move(const state &s) {
   auto [player, monster] = s;
   if (player.hit_points > 0 && monster.hit_points > 0) {
     return roll(20) >> [=](int to_hit) {
@@ -83,7 +99,7 @@ ddist<state> player_move(const state s) {
   }
 }
 
-ddist<state> monster_move(const state s) {
+ddist<state> monster_move(const state &s) {
   auto [player, monster] = s;
   if (monster.hit_points > 0 && player.hit_points > 0) {
     return roll(20) >> [=](int to_hit) {
