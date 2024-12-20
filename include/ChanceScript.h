@@ -17,15 +17,15 @@ struct atom {
 };
 
 template<typename Prob, typename T>
-struct Dist;
+struct dist;
 
 template<typename Prob, typename T, typename F>
-std::invoke_result_t<F, T> then(const Dist<Prob, T> &m, const F& f);
+std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f);
 
 template<typename Prob, typename T>
-struct Dist
+struct dist
 {
-  Dist(std::initializer_list<atom<Prob, T>> pdf_in) : pdf(pdf_in) {}
+  dist(std::initializer_list<atom<Prob, T>> pdf_in) : pdf(pdf_in) {}
 
   std::vector<atom<Prob, T>> pdf;
 
@@ -69,6 +69,9 @@ struct Dist
   }
 };
 
+template <typename X>
+using ddist = dist<double, X>;
+
 template <typename Prob = double, typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec)
 {
@@ -104,7 +107,7 @@ void sortAndCombine(std::vector<atom<Prob, T>>& atoms) {
 }
 
 template<typename Prob, typename T, typename F>
-std::invoke_result_t<F, T> then(const Dist<Prob, T> &m, const F& f)
+std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f)
 {
     std::invoke_result_t<F, T> result{};
     for (const auto& x : m.pdf)
@@ -122,9 +125,9 @@ std::invoke_result_t<F, T> then(const Dist<Prob, T> &m, const F& f)
 }
 
 template<typename Prob, typename T, typename F>
-Dist<Prob, std::invoke_result_t<F, T>> fmap(const Dist<Prob, T> &m, const F& f)
+dist<Prob, std::invoke_result_t<F, T>> fmap(const dist<Prob, T> &m, const F& f)
 {
-    Dist<Prob, std::invoke_result_t<F, T>> result{};
+    dist<Prob, std::invoke_result_t<F, T>> result{};
     for (const auto& x : m.pdf)
     {
         auto fx = f(x.value);
@@ -136,9 +139,9 @@ Dist<Prob, std::invoke_result_t<F, T>> fmap(const Dist<Prob, T> &m, const F& f)
 }
 
 template<typename Prob = double>
-Dist<Prob, int> roll(int n)
+dist<Prob, int> roll(int n)
 {
-  Dist<Prob, int> result{};
+  dist<Prob, int> result{};
   result.pdf.resize(n);
   for (int i = 0; i < n; ++i)
   {
@@ -149,9 +152,9 @@ Dist<Prob, int> roll(int n)
 }
 
 template<typename Prob = double, typename T>
-Dist<Prob, T> certainly(const T& t)
+dist<Prob, T> certainly(const T& t)
 {
-  return Dist<Prob, T>{{t, 1.0}};
+  return dist<Prob, T>{{t, 1.0}};
 }
 
 #define DO(b) [&](){ b; }();
@@ -192,7 +195,7 @@ void test1()
 }
 
 template <typename Prob = double, typename T>
-Dist<Prob, std::vector<T>> sequence(const std::vector<Dist<Prob, T>> &dists,
+dist<Prob, std::vector<T>> sequence(const std::vector<dist<Prob, T>> &dists,
                                     int starting_from = 0) {
   if (starting_from >= dists.size())
   {
@@ -206,7 +209,7 @@ Dist<Prob, std::vector<T>> sequence(const std::vector<Dist<Prob, T>> &dists,
 }
 
 template<typename Prob = double, typename T, typename F>
-Dist<Prob, T> fold(const F& f, const T& init, const std::vector<Dist<Prob, T>>& dists, int starting_from = 0)
+dist<Prob, T> fold(const F& f, const T& init, const std::vector<dist<Prob, T>>& dists, int starting_from = 0)
 {
   if (starting_from >= dists.size())
   {
@@ -219,7 +222,7 @@ Dist<Prob, T> fold(const F& f, const T& init, const std::vector<Dist<Prob, T>>& 
 }
 
 template<typename Prob = double, typename T, typename F>
-Dist<Prob, T> repeated(const F& f, const T& init, const Dist<Prob, T>& dist, int n)
+dist<Prob, T> repeated(const F& f, const T& init, const dist<Prob, T>& dist, int n)
 {
   if (n <= 0)
   {
@@ -244,8 +247,8 @@ Dist<Prob, T> repeated(const F& f, const T& init, const Dist<Prob, T>& dist, int
 
 void test2()
 {
-    std::vector<Dist<double, int>> rolls{roll(6), roll(6), roll(6), roll(6)};
-    Dist<double, std::vector<int>> r = sequence(rolls);
+    std::vector<dist<double, int>> rolls{roll(6), roll(6), roll(6), roll(6)};
+    dist<double, std::vector<int>> r = sequence(rolls);
     for (auto z : r.pdf)
     {
         std::cout << z << std::endl;
@@ -254,7 +257,7 @@ void test2()
 
 void test3()
 {
-    Dist<double, int> r = repeated([](int x, int y) { return std::max(x, y); }, 0, roll(6), 50);
+    dist<double, int> r = repeated([](int x, int y) { return std::max(x, y); }, 0, roll(6), 50);
     for (auto z : r.pdf)
     {
         std::cout << z << std::endl;
@@ -262,9 +265,9 @@ void test3()
 }
 
 template<typename Prob = double, typename X, typename F>
-Dist<Prob, X> iterate(const X& init, const F& f, int n)
+dist<Prob, X> iterate(const X& init, const F& f, int n)
 {
-    Dist<double, X> r = certainly(init);
+    dist<double, X> r = certainly(init);
     for (int i = 0; i < n; ++i)
     {
       r = r >> f;
@@ -313,7 +316,7 @@ void test4a()
 }
 
 template<typename Prob = double, typename F, typename... FArgs>
-Dist<Prob, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
+dist<Prob, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 {
     if (n == 0)
     {
@@ -323,7 +326,7 @@ Dist<Prob, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 }
 
 template<typename Prob = double, typename... FArgs>
-Dist<Prob, std::tuple<FArgs...>> certainly_all(FArgs... Args)
+dist<Prob, std::tuple<FArgs...>> certainly_all(FArgs... Args)
 {
         return certainly(std::tuple<FArgs...>(Args...));
 }
@@ -367,7 +370,7 @@ struct Character
 };
 
 template<typename Prob = double>
-Dist<Prob, Character> attacks(const Character& player, const Character& monster)
+dist<Prob, Character> attacks(const Character& player, const Character& monster)
 {
   if (player.hit_points > 0)
   {
@@ -408,7 +411,7 @@ void test6()
 }
 
 template<typename Prob = double>
-Dist<Prob, std::vector<int>> roll_keep(int r, int k)
+dist<Prob, std::vector<int>> roll_keep(int r, int k)
 {
   if (r == 0)
   {
@@ -460,7 +463,7 @@ int main()
 #endif
 
 template<typename Prob, typename T>
-bool subdist(const Dist<Prob, T>& a, const Dist<Prob, T>& b)
+bool subdist(const dist<Prob, T>& a, const dist<Prob, T>& b)
 {
   int i = 0;
   int j = 0;
@@ -542,9 +545,9 @@ struct setup
 };
 
 template<typename Prob = double, typename X>
-Dist<Prob, X> convert_to_pdf(setup<Prob, X> *s, const std::vector<Prob>& v)
+dist<Prob, X> convert_to_pdf(setup<Prob, X> *s, const std::vector<Prob>& v)
 {
-  Dist<Prob, X> d{};
+  dist<Prob, X> d{};
   for (int i = 0; i < v.size(); ++i)
   {
     d.pdf.emplace_back(s->values[i], v[i]);
@@ -567,7 +570,7 @@ setup<Prob, X> *build_matrix(const X& x, const F& f)
   sparse_vector<Prob> row;
   while (next_value_to_process < values_to_process.size())
   {
-    Dist<Prob, X> r = f(values_to_process[next_value_to_process]);
+    dist<Prob, X> r = f(values_to_process[next_value_to_process]);
     row.clear();
     for (auto& [value, prob] : r.pdf)
     {
@@ -592,9 +595,9 @@ setup<Prob, X> *build_matrix(const X& x, const F& f)
 }
 
 template<typename Prob = double, typename X, typename F>
-Dist<Prob, X> iterate_i(const X& init, const F& f, int n)
+dist<Prob, X> iterate_i(const X& init, const F& f, int n)
 {
-    Dist<Prob, X> r = certainly(init);
+    dist<Prob, X> r = certainly(init);
     for (int i = 0; i < n; ++i)
     {
       const auto old_r = r;
@@ -609,7 +612,7 @@ Dist<Prob, X> iterate_i(const X& init, const F& f, int n)
 }
 
 template<typename Prob = double, typename X, typename F>
-Dist<Prob, X> iterate_matrix_i(const X &init, const F& f, int n)
+dist<Prob, X> iterate_matrix_i(const X &init, const F& f, int n)
 {
   setup<Prob, X> *s = build_matrix<Prob>(init, f);
   // dump_matrix(s->m);
