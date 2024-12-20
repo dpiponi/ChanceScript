@@ -8,6 +8,8 @@ project(ChanceScript VERSION 1.0)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
+
 # Add the header-only library (include directory only)
 add_library(ChanceScript INTERFACE)
 
