@@ -37,6 +37,18 @@ TEST(ChanceScript, test3) {
   }
 }
 
+TEST(ChanceScript, test4) {
+  auto r = roll(6).and_then([](int x) {
+    return roll(6).transform([=](int y) {
+      return x + y;
+    });
+  });
+
+  for (auto [x, p] : r.pdf) {
+    EXPECT_FLOAT_EQ(p, std::min(x - 1, 13 - x) / 36.0);
+  }
+}
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
