@@ -79,7 +79,7 @@ dist<Prob, X> update_field(const X &x, Y (X::*field), const dist<Prob, Y> &dy)
 //   return [](
 // }
 
-ddist<state> player_move(const state &s) {
+ddist<state> player_move(const state& s) {
   auto [player, monster] = s;
   if (player.hit_points > 0 && monster.hit_points > 0) {
     return roll(20).and_then([=](int to_hit) {

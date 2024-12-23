@@ -5,10 +5,10 @@
 #include <type_traits>
 #include <algorithm>
 
-template<typename Prob, typename T>
+template<typename P, typename T>
 struct atom {
   T value;
-  Prob prob;
+  P prob;
 
   auto operator<=>(const atom& other) const
   {
@@ -16,29 +16,43 @@ struct atom {
   }
 };
 
-template<typename Prob, typename T>
+template<typename P, typename T>
 struct dist;
 
-template<typename Prob, typename T, typename F>
-std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f);
+template<typename P, typename T, typename F>
+std::invoke_result_t<F, T> then(const dist<P, T> &m, const F& f);
 
-template<typename Prob, typename T, typename F>
-dist<Prob, std::invoke_result_t<F, T>> fmap(const dist<Prob, T> &m, const F& f);
+template<typename P, typename T, typename F>
+dist<P, std::invoke_result_t<F, T>> fmap(const dist<P, T> &m, const F& f);
 
-template<typename Prob, typename T>
+template<typename P, typename T>
 struct dist
 {
-  dist(std::initializer_list<atom<Prob, T>> pdf_in) : pdf(pdf_in) {}
+  dist(std::initializer_list<atom<P, T>> pdf_in) : pdf(pdf_in) {}
 
-  std::vector<atom<Prob, T>> pdf;
+  void combine() {
+    std::vector<atom<P, T>> combined;
+    for (const auto& atom : pdf) {
+      if (!combined.empty() && combined.back().value == atom.value) {
+        combined.back().prob += atom.prob;
+      } else {
+        combined.push_back(atom);
+      }
+    }
 
-  void resort()
+    pdf = std::move(combined);
+  }
+
+  void sort()
   {
-    sort(pdf.begin(), pdf.end());
+    std::sort(pdf.begin(), pdf.end());
+  }
 
+  void remove_zero()
+  {
     pdf.erase(
         std::remove_if(
-          pdf.begin(), pdf.end(), [](const atom<Prob, T>& p) {
+          pdf.begin(), pdf.end(), [](const atom<P, T>& p) {
             return p.prob == 0;
         }),
         pdf.end()
@@ -48,12 +62,38 @@ struct dist
   template<typename F>
   std::invoke_result_t<F, T> and_then(const F& f)
   {
-    return then(*this, f);
+    std::invoke_result_t<F, T> result{};
+    for (const auto& x : pdf)
+    {
+        auto fx = f(x.value);
+        double prob = x.prob;
+        for (auto& r : fx.pdf)
+        {
+            result.pdf.push_back(atom{r.value, prob * r.prob});
+        }
+    }
+
+    result.sort();
+    result.combine();
+    result.remove_zero();
+
+    return result;
   }
 
   template<typename F>
-  dist<Prob, std::invoke_result_t<F, T>> transform(const dist<Prob, T> &m, const F& f) {
-    return fmap(*this, f);
+  dist<P, std::invoke_result_t<F, T>> transform(const F& f) {
+    dist<P, std::invoke_result_t<F, T>> result{};
+    for (const auto& x : pdf)
+    {
+        auto fx = f(x.value);
+        result.pdf.push_back(atom{fx, x.prob});
+    }
+
+    result.sort();
+    result.combine();
+    result.remove_zero();
+
+    return result;
   }
 
   template<typename F>
@@ -81,12 +121,14 @@ struct dist
       std::cout << value << ": " << prob << std::endl;
     }
   }
+
+  std::vector<atom<P, T>> pdf;
 };
 
 template <typename X>
 using ddist = dist<double, X>;
 
-template <typename Prob = double, typename T>
+template <typename P = double, typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec)
 {
     for (const T& elem : vec) {
@@ -95,20 +137,20 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec)
     return os;
 }
 
-template <typename Prob = double, typename T>
-std::ostream& operator<<(std::ostream& os, const atom<Prob, T>& atom)
+template <typename P = double, typename T>
+std::ostream& operator<<(std::ostream& os, const atom<P, T>& atom)
 {
     os << "atom(value: " << atom.value << ", prob: " << atom.prob << ")";
     return os;
 }
 
-template <typename Prob = double, typename T>
-void sortAndCombine(std::vector<atom<Prob, T>>& atoms) {
-    std::sort(atoms.begin(), atoms.end(), [](const atom<Prob, T>& a, const atom<Prob, T>& b) {
+template <typename P = double, typename T>
+void sort_and_combine(std::vector<atom<P, T>>& atoms) {
+    std::sort(atoms.begin(), atoms.end(), [](const atom<P, T>& a, const atom<P, T>& b) {
         return a.value < b.value;
     });
 
-    std::vector<atom<Prob, T>> combined;
+    std::vector<atom<P, T>> combined;
     for (const auto& atom : atoms) {
         if (!combined.empty() && combined.back().value == atom.value) {
             combined.back().prob += atom.prob;
@@ -120,8 +162,8 @@ void sortAndCombine(std::vector<atom<Prob, T>>& atoms) {
     atoms = std::move(combined);
 }
 
-template<typename Prob, typename T, typename F>
-std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f)
+template<typename P, typename T, typename F>
+std::invoke_result_t<F, T> then(const dist<P, T> &m, const F& f)
 {
     std::invoke_result_t<F, T> result{};
     for (const auto& x : m.pdf)
@@ -134,28 +176,28 @@ std::invoke_result_t<F, T> then(const dist<Prob, T> &m, const F& f)
         }
     }
 
-    sortAndCombine(result.pdf);
+    sort_and_combine(result.pdf);
     return result;
 }
 
-template<typename Prob, typename T, typename F>
-dist<Prob, std::invoke_result_t<F, T>> fmap(const dist<Prob, T> &m, const F& f)
+template<typename P, typename T, typename F>
+dist<P, std::invoke_result_t<F, T>> fmap(const dist<P, T> &m, const F& f)
 {
-    dist<Prob, std::invoke_result_t<F, T>> result{};
+    dist<P, std::invoke_result_t<F, T>> result{};
     for (const auto& x : m.pdf)
     {
         auto fx = f(x.value);
         result.pdf.push_back(atom{fx, x.prob});
     }
 
-    sortAndCombine(result.pdf);
+    sort_and_combine(result.pdf);
     return result;
 }
 
-template<typename Prob = double>
-dist<Prob, int> roll(int n)
+template<typename P = double>
+dist<P, int> roll(int n)
 {
-  dist<Prob, int> result{};
+  dist<P, int> result{};
   result.pdf.resize(n);
   for (int i = 0; i < n; ++i)
   {
@@ -165,10 +207,10 @@ dist<Prob, int> roll(int n)
   return result;
 }
 
-template<typename Prob = double, typename T>
-dist<Prob, T> certainly(const T& t)
+template<typename P = double, typename T>
+dist<P, T> certainly(const T& t)
 {
-  return dist<Prob, T>{{t, 1.0}};
+  return dist<P, T>{{t, 1.0}};
 }
 
 #define DO(b) [&](){ b; }();
@@ -208,8 +250,8 @@ void test1()
     }
 }
 
-template <typename Prob = double, typename T>
-dist<Prob, std::vector<T>> sequence(const std::vector<dist<Prob, T>> &dists,
+template <typename P = double, typename T>
+dist<P, std::vector<T>> sequence(const std::vector<dist<P, T>> &dists,
                                     int starting_from = 0) {
   if (starting_from >= dists.size())
   {
@@ -222,8 +264,8 @@ dist<Prob, std::vector<T>> sequence(const std::vector<dist<Prob, T>> &dists,
     RETURN(concatenate(std::vector<T>{head}, tail)))));
 }
 
-template<typename Prob = double, typename T, typename F>
-dist<Prob, T> fold(const F& f, const T& init, const std::vector<dist<Prob, T>>& dists, int starting_from = 0)
+template<typename P = double, typename T, typename F>
+dist<P, T> fold(const F& f, const T& init, const std::vector<dist<P, T>>& dists, int starting_from = 0)
 {
   if (starting_from >= dists.size())
   {
@@ -235,8 +277,8 @@ dist<Prob, T> fold(const F& f, const T& init, const std::vector<dist<Prob, T>>& 
     return fold(f, f(init, head), dists, starting_from + 1)));
 }
 
-template<typename Prob = double, typename T, typename F>
-dist<Prob, T> repeated(const F& f, const T& init, const dist<Prob, T>& dist, int n)
+template<typename P = double, typename T, typename F>
+dist<P, T> repeated(const F& f, const T& init, const dist<P, T>& dist, int n)
 {
   if (n <= 0)
   {
@@ -278,8 +320,8 @@ void test3()
     }
 }
 
-template<typename Prob = double, typename X, typename F>
-dist<Prob, X> iterate(const X& init, const F& f, int n)
+template<typename P = double, typename X, typename F>
+dist<P, X> iterate(const X& init, const F& f, int n)
 {
     dist<double, X> r = certainly(init);
     for (int i = 0; i < n; ++i)
@@ -329,8 +371,8 @@ void test4a()
     }
 }
 
-template<typename Prob = double, typename F, typename... FArgs>
-dist<Prob, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
+template<typename P = double, typename F, typename... FArgs>
+dist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 {
     if (n == 0)
     {
@@ -339,8 +381,8 @@ dist<Prob, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
     return iterate_all(f, n - 1, Args...) >> [f](const std::tuple<FArgs...> ArgsTuple) { return std::apply(f, ArgsTuple); };
 }
 
-template<typename Prob = double, typename... FArgs>
-dist<Prob, std::tuple<FArgs...>> certainly_all(FArgs... Args)
+template<typename P = double, typename... FArgs>
+dist<P, std::tuple<FArgs...>> certainly_all(FArgs... Args)
 {
         return certainly(std::tuple<FArgs...>(Args...));
 }
@@ -383,8 +425,8 @@ struct Character
   }
 };
 
-template<typename Prob = double>
-dist<Prob, Character> attacks(const Character& player, const Character& monster)
+template<typename P = double>
+dist<P, Character> attacks(const Character& player, const Character& monster)
 {
   if (player.hit_points > 0)
   {
@@ -424,8 +466,8 @@ void test6()
     }
 }
 
-template<typename Prob = double>
-dist<Prob, std::vector<int>> roll_keep(int r, int k)
+template<typename P = double>
+dist<P, std::vector<int>> roll_keep(int r, int k)
 {
   if (r == 0)
   {
@@ -476,8 +518,8 @@ int main()
 }
 #endif
 
-template<typename Prob, typename T>
-bool subdist(const dist<Prob, T>& a, const dist<Prob, T>& b)
+template<typename P, typename T>
+bool subdist(const dist<P, T>& a, const dist<P, T>& b)
 {
   int i = 0;
   int j = 0;
@@ -494,15 +536,15 @@ bool subdist(const dist<Prob, T>& a, const dist<Prob, T>& b)
 }
 
 // using prob = double;
-template<typename Prob>
-using sparse_vector = std::vector<std::pair<int, Prob>>;
-template<typename Prob>
-using matrix = std::vector<sparse_vector<Prob>>;
+template<typename P>
+using sparse_vector = std::vector<std::pair<int, P>>;
+template<typename P>
+using matrix = std::vector<sparse_vector<P>>;
 
-template<typename Prob>
-Prob dot_sparse_dense(const sparse_vector<Prob>& s, const std::vector<Prob>& d)
+template<typename P>
+P dot_sparse_dense(const sparse_vector<P>& s, const std::vector<P>& d)
 {
-  Prob t = 0.0;
+  P t = 0.0;
   for (const auto [i, x] : s)
   {
     t += x * d[i];
@@ -510,10 +552,10 @@ Prob dot_sparse_dense(const sparse_vector<Prob>& s, const std::vector<Prob>& d)
   return t;
 }
 
-template<typename Prob>
-std::vector<Prob> dot_matrix_vector(const matrix<Prob>& m, const std::vector<Prob>& d)
+template<typename P>
+std::vector<P> dot_matrix_vector(const matrix<P>& m, const std::vector<P>& d)
 {
-  std::vector<Prob> r;
+  std::vector<P> r;
   r.resize(d.size());
   for (int i = 0; i < d.size(); ++i) { r[i] = 0.0; }
   for (int i = 0; i < d.size(); ++i)
@@ -526,8 +568,8 @@ std::vector<Prob> dot_matrix_vector(const matrix<Prob>& m, const std::vector<Pro
   return r;
 }
 
-template<typename Prob>
-void dump_vector(const std::vector<Prob>& v)
+template<typename P>
+void dump_vector(const std::vector<P>& v)
 {
   for (int i = 0; i < v.size(); ++i)
   {
@@ -536,8 +578,8 @@ void dump_vector(const std::vector<Prob>& v)
   std::cout << std::endl;
 }
 
-template<typename Prob>
-void dump_matrix(const matrix<Prob>& m)
+template<typename P>
+void dump_matrix(const matrix<P>& m)
 {
   for (int i = 0; i < m.size(); ++i)
   {
@@ -550,28 +592,30 @@ void dump_matrix(const matrix<Prob>& m)
   }
 }
 
-template<typename Prob, typename X>
+template<typename P, typename X>
 struct setup
 {
-  matrix<Prob> m;
+  matrix<P> m;
   std::map<X, int> labels;
   std::vector<X> values;
 };
 
-template<typename Prob = double, typename X>
-dist<Prob, X> convert_to_pdf(setup<Prob, X> *s, const std::vector<Prob>& v)
+template<typename P = double, typename X>
+dist<P, X> convert_to_pdf(setup<P, X> *s, const std::vector<P>& v)
 {
-  dist<Prob, X> d{};
+  dist<P, X> d{};
   for (int i = 0; i < v.size(); ++i)
   {
     d.pdf.emplace_back(s->values[i], v[i]);
   }
-  d.resort();
+  d.sort();
+  d.remove_zero();
+
   return d;
 }
 
-template<typename Prob, typename X, typename F>
-setup<Prob, X> *build_matrix(const X& x, const F& f)
+template<typename P, typename X, typename F>
+setup<P, X> *build_matrix(const X& x, const F& f)
 {
   std::map<X, int> labels;
   int next_label = 0;
@@ -579,12 +623,12 @@ setup<Prob, X> *build_matrix(const X& x, const F& f)
   std::vector<X> values_to_process;
   values_to_process.push_back(x);
   int next_value_to_process = 0;
-  matrix<Prob> m;
+  matrix<P> m;
 
-  sparse_vector<Prob> row;
+  sparse_vector<P> row;
   while (next_value_to_process < values_to_process.size())
   {
-    dist<Prob, X> r = f(values_to_process[next_value_to_process]);
+    dist<P, X> r = f(values_to_process[next_value_to_process]);
     row.clear();
     for (auto& [value, prob] : r.pdf)
     {
@@ -608,10 +652,10 @@ setup<Prob, X> *build_matrix(const X& x, const F& f)
   return new setup{m, labels, values_to_process};
 }
 
-template<typename Prob = double, typename X, typename F>
-dist<Prob, X> iterate_i(const X& init, const F& f, int n)
+template<typename P = double, typename X, typename F>
+dist<P, X> iterate_i(const X& init, const F& f, int n)
 {
-    dist<Prob, X> r = certainly(init);
+    dist<P, X> r = certainly(init);
     for (int i = 0; i < n; ++i)
     {
       const auto old_r = r;
@@ -625,13 +669,13 @@ dist<Prob, X> iterate_i(const X& init, const F& f, int n)
     return r;
 }
 
-template<typename Prob = double, typename X, typename F>
-dist<Prob, X> iterate_matrix_i(const X &init, const F& f, int n)
+template<typename P = double, typename X, typename F>
+dist<P, X> iterate_matrix_i(const X &init, const F& f, int n)
 {
-  setup<Prob, X> *s = build_matrix<Prob>(init, f);
+  setup<P, X> *s = build_matrix<P>(init, f);
   // dump_matrix(s->m);
   int dim = s->values.size();
-  std::vector<Prob> v;
+  std::vector<P> v;
   v.resize(dim);
   std::fill(v.begin(), v.end(), 0);
   v[0] = 1;

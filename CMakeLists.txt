@@ -1,25 +1,29 @@
-# CMake minimum version requirement
 cmake_minimum_required(VERSION 3.10)
 
-# Project name and version
 project(ChanceScript VERSION 1.0)
 
-# Specify C++ standard
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/release-1.12.1.tar.gz
+  DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+)
+FetchContent_MakeAvailable(googletest)
+enable_testing() 
 
-# Add the header-only library (include directory only)
+add_executable(ChanceScriptTests tests/test_main.cpp) 
+target_link_libraries(ChanceScriptTests PRIVATE gtest_main ChanceScript)
+add_test(NAME ChanceScriptTests COMMAND ChanceScriptTests) 
+
 add_library(ChanceScript INTERFACE)
 
-# Specify the include directories for the library
 target_include_directories(ChanceScript INTERFACE include)
 
-# Add example executables
 add_executable(ex1 src/ex1.cpp)
 add_executable(ex2 src/ex2.cpp)
 
-# Link the header-only library to the example executables
 target_link_libraries(ex1 PRIVATE ChanceScript)
 target_link_libraries(ex2 PRIVATE ChanceScript)
