@@ -1,77 +1,137 @@
-#include <iostream>
-#include <functional>
-#include <vector>
-#include <type_traits>
 #include <algorithm>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <type_traits>
+#include <vector>
 
 #include "ChanceScript.h"
 
-template<typename T>
-void Dump(const Dist<T>& dist)
+template <typename X, typename Y>
+X update(const X &x, Y(X::*y), const Y &y_new)
 {
-  for (auto z : dist.pdf)
-  {
-      std::cout << z.value << ' ' << z.prob << std::endl;
-  }
+    X x_copy(x);
+    x_copy.*y = y_new;
+    return x_copy;
 }
 
-// [1,3,5] < [1,2,3,4]
-// [1,3,5,7] !< [1,3]
-template<typename T>
-bool subdist(const Dist<T>& a, const Dist<T>& b)
+template <typename P = double, typename X, typename Y>
+dist<P, X> updateP(const X &x, Y(X::*y), const dist<P, Y> &ys_new)
 {
-  int i = 0;
-  int j = 0;
-  while (i < a.pdf.size() && j < b.pdf.size())
-  {
-    if (a.pdf[i].value == b.pdf[j].value)
+    return ys_new >> [&](const Y &y_new)
     {
-      ++i;
-    } else if (a.pdf[i].value < b.pdf[j].value)
+        X x_copy(x);
+        x_copy.*y = y_new;
+        return certainly(x_copy);
+    };
+}
+
+struct character
+{
+    int hit_points;
+
+    auto operator<=>(const character &) const = default;
+    character damage(int damage) const
     {
-      return false;
-    } else
-    if (a.pdf[i].value > b.pdf[j].value)
-    {
-      ++j;
+        if (damage >= hit_points)
+        {
+            return character{0};
+        }
+        else
+        {
+            return character{std::max(0, hit_points - damage)};
+        }
     }
-  }
-  return i == a.pdf.size();
-}
+};
 
-template<typename X, typename F>
-Dist<X> do_as_matrix(const Dist<X>& d, const F& f)
+struct state
 {
-  for (auto& [v, p] : d.pdf)
-  {
-    auto row = v >> f;
-  }
-}
+    character player;
+    character monster;
 
-template<typename X, typename F>
-Dist<X> iterate_i(const X& init, const F& f, int n)
-{
-    Dist<X> r = certainly(init);
-    for (int i = 0; i < n; ++i)
+    auto operator<=>(const state &) const = default;
+
+    template <typename Prob = double>
+    static dist<Prob, character> do_attackP(const character &player,
+                                            const character &monster)
     {
-      const auto old_r = r;
-      r = old_r >> f;
-      std::cout << old_r.pdf.size() << '/' << r.pdf.size() << std::endl;
-      if (subdist(r, old_r))
-      {
-        std::cout << "Explored old" << std::endl;
-        Dump(old_r);
-        std::cout << "And new" << std::endl;
-        Dump(r);
-        std::cout << "---" << std::endl;
-        do_as_matrix(r, F);
-      }
+        if (player.hit_points > 0)
+        {
+            return roll(20).and_then(
+                [=](int player_hit_roll)
+                {
+                    return player_hit_roll >= 11
+                               ? roll(6).transform(
+                                     [=](int player_damage)
+                                     { return monster.damage(player_damage); })
+                               : certainly(monster);
+                });
+        }
+        else
+        {
+            return certainly(monster);
+        }
     }
-    return r;
+
+    ddist<state> attacksP(character(state::*player),
+                          character(state::*monster)) const
+    {
+        return updateP(*this, monster,
+                       do_attackP(this->*player, this->*monster));
+    }
+};
+
+template <typename Prob = double, typename X, typename Y>
+dist<Prob, X> update_field(const X &x, Y(X::*field), const dist<Prob, Y> &dy)
+{
+    return dy >> [=](const Y &y)
+    {
+        X x_new = x;
+        x_new.*field = y;
+        return certainly(x_new);
+    };
+}
+
+ddist<state> player_move(const state &s)
+{
+    if (s.monster.hit_points > 0 && s.player.hit_points > 0)
+    {
+        return s.attacksP(&state::player, &state::monster);
+    }
+    else
+    {
+        return certainly(s);
+    }
+}
+
+ddist<state> monster_move(const state &s)
+{
+    if (s.monster.hit_points > 0 && s.player.hit_points > 0)
+    {
+        return s.attacksP(&state::monster, &state::player);
+    }
+    else
+    {
+        return certainly(s);
+    }
+}
+
+void test6a()
+{
+    state s{{6}, {100}};
+
+    ddist<state> r = iterate_matrix_i(
+        s, [](const state s) { return player_move(s).and_then(monster_move); },
+        1000);
+
+    for (auto z : r.pdf)
+    {
+        std::cout << z.value.player.hit_points << ' '
+                  << z.value.monster.hit_points << ' ' << z.prob << std::endl;
+    }
 }
 
 int main()
 {
-  auto r = iterate_i(0, [](int x) { return roll(6) >> [=](int y) { return certainly(std::min(9, x + y)); }; }, 3);
-  Dump(r);
+    test6a();
 }
