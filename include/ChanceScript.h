@@ -806,3 +806,22 @@ dist<P, X> iterate_matrix_i(const X &init, const F &f, int n)
   auto p = convert_to_pdf(s, v);
   return p;
 }
+
+template <typename X, typename Y>
+X update(const X &x, Y(X::*y), const Y &y_new)
+{
+  X x_copy(x);
+  x_copy.*y = y_new;
+  return x_copy;
+}
+
+template <typename P = double, typename X, typename Y>
+dist<P, X> updateP(const X &x, Y(X::*y), const dist<P, Y> &ys_new)
+{
+  return ys_new >> [&](const Y &y_new)
+  {
+    X x_copy(x);
+    x_copy.*y = y_new;
+    return certainly(x_copy);
+  };
+}
