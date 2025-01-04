@@ -763,6 +763,7 @@ template <typename P = double, typename X, typename F>
 TDist<P, X> iterate_matrix_i(const X& init, const F& f, int n)
 {
 	setup<P, X>* s = build_matrix<P>(init, f);
+  std::cout << "Made matrix" << std::endl;
 	// dump_matrix(s->m);
 	int			   dim = s->values.size();
 	std::vector<P> v;

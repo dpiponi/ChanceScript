@@ -23,29 +23,34 @@ struct FState;
 
 struct FFighter : public FCharacter
 {
-	TDDist<FState> do_move(const FState& s) const;
+	TDDist<FState> do_move(const FState& State) const;
 };
 
 struct FCleric : public FCharacter
 {
-	TDDist<FState> do_move(const FState& s) const;
+	TDDist<FState> do_move(const FState& State) const;
 
 	int NumCureLightWounds;
 };
 
 struct FOgre : public FCharacter
 {
-	TDDist<FState> do_move(const FState& s) const;
+	TDDist<FState> do_move(const FState& State) const;
 };
 
 struct FState
 {
 	FFighter Fighter;
 	FCleric	 Cleric;
-	FOgre	 Ogre;
+	FOgre	 Ogre1;
+	FOgre	 Ogre2;
 
 	auto operator<=>(const FState&) const = default;
 
+	bool GameOver() const
+	{
+		return Ogre1.HitPoints == 0 && Ogre2.HitPoints == 0 || Fighter.HitPoints == 0 && Cleric.HitPoints == 0;
+	}
 #if 1
 	template <typename Prob = double, typename AttackerType, typename DefenderType>
 	static TDist<Prob, DefenderType>
@@ -84,19 +89,26 @@ struct FState
 #endif
 };
 
-const TDDist<int> d8 = roll(8);
+const TDDist<int> SwordDamage = roll(8);
 
-TDDist<FState> FFighter::do_move(const FState& s) const
+TDDist<FState> FFighter::do_move(const FState& State) const
 {
-	if (s.Ogre.HitPoints > 0 && HitPoints > 0)
+	if (!State.GameOver() && HitPoints > 0)
 	{
-		// Level 2 FFighter to hit AC5: 15
-		// Longsword Damage 1d8
-		return s.attacksP(15, d8, *this, &FState::Ogre);
+		if (State.Ogre1.HitPoints > State.Ogre2.HitPoints)
+		{
+			// Level 2 FFighter to hit AC5: 15
+			// Longsword Damage 1d8
+			return State.attacksP(15, SwordDamage, *this, &FState::Ogre1);
+		}
+		else
+		{
+			return State.attacksP(15, SwordDamage, *this, &FState::Ogre2);
+		}
 	}
 	else
 	{
-		return certainly(s);
+		return certainly(State);
 	}
 }
 
@@ -107,50 +119,56 @@ TDDist<int> MaceDamage = roll(6) + 1;
 
 TDDist<int> cure_light_wounds_hp = roll(8);
 
-TDDist<FState> FCleric::do_move(const FState& s) const
+TDDist<FState> FCleric::do_move(const FState& State) const
 {
-	if (s.Ogre.HitPoints > 0 && HitPoints > 0 && s.Fighter.HitPoints > 0
-		&& s.Fighter.HitPoints <= threshold && NumCureLightWounds > 0)
+	if (!State.GameOver() && HitPoints > 0)
 	{
-		return cure_light_wounds_hp.transform(
-			[&s](int heal) {
-				FState s_copy = s;
-				--s_copy.Cleric.NumCureLightWounds;
-				s_copy.Fighter.HitPoints =
-					std::min(max_hp, s_copy.Fighter.HitPoints + heal);
-				return s_copy;
-			});
-	}
-	else if (s.Ogre.HitPoints > 0 && HitPoints > 0)
-	{
-		// Level 2 FCleric to hit AC5: 15+
-		// Mace d6+1 Damage
-		return s.attacksP(15, MaceDamage, *this, &FState::Ogre);
+		if (State.Fighter.HitPoints <= threshold && NumCureLightWounds > 0)
+		{
+			return cure_light_wounds_hp.transform(
+				[&State](int heal) {
+					FState s_copy = State;
+					--s_copy.Cleric.NumCureLightWounds;
+					s_copy.Fighter.HitPoints =
+						std::min(max_hp, s_copy.Fighter.HitPoints + heal);
+					return s_copy;
+				});
+		}
+		else if (State.Ogre1.HitPoints > State.Ogre2.HitPoints)
+		{
+			// Level 2 FCleric to hit AC5: 15+
+			// Mace d6+1 Damage
+			return State.attacksP(15, MaceDamage, *this, &FState::Ogre1);
+		}
+		else
+		{
+			return State.attacksP(15, MaceDamage, *this, &FState::Ogre2);
+		}
 	}
 	else
 	{
-		return certainly(s);
+		return certainly(State);
 	}
 }
 
 TDDist<int> ogre_damage = roll(10);
 
-TDDist<FState> FOgre::do_move(const FState& s) const
+TDDist<FState> FOgre::do_move(const FState& State) const
 {
-	if (s.Ogre.HitPoints > 0)
+	if (!State.GameOver() && HitPoints > 0)
 	{
-		if (s.Fighter.HitPoints > s.Cleric.HitPoints)
+		if (State.Fighter.HitPoints > State.Cleric.HitPoints)
 		{
-			return s.attacksP(13, ogre_damage, *this, &FState::Fighter);
+			return State.attacksP(13, ogre_damage, *this, &FState::Fighter);
 		}
 		else
 		{
-			return s.attacksP(13, ogre_damage, *this, &FState::Cleric);
+			return State.attacksP(13, ogre_damage, *this, &FState::Cleric);
 		}
 	}
 	else
 	{
-		return certainly(s);
+		return certainly(State);
 	}
 }
 
@@ -160,21 +178,22 @@ void test()
 	{
 		threshold = t;
 
-		FState s{ { 9 }, { { 7 }, 2 }, { 15 } };
+		FState State{ { 9 }, { { 7 }, 2 }, { 15 }, { 15 } };
 
 		TDDist<FState> r = iterate_matrix_i(
-			s,
-			[](const FState s) {
-				return s.Fighter.do_move(s)
-					.and_then([](const FState& s) { return s.Cleric.do_move(s); })
-					.and_then([](const FState& s) { return s.Ogre.do_move(s); });
+			State,
+			[](const FState State) {
+				return State.Fighter.do_move(State)
+					.and_then([](const FState& State) { return State.Cleric.do_move(State); })
+					.and_then([](const FState& State) { return State.Ogre1.do_move(State); })
+					.and_then([](const FState& State) { return State.Ogre2.do_move(State); });
 			},
-			100);
+			50);
 
 		//    r.chop(1e-10);
 
 		auto q = r.transform(
-			[](const FState& s) { return (s.Fighter.HitPoints > 0) + (s.Cleric.HitPoints > 0); });
+			[](const FState& State) { return (State.Fighter.HitPoints > 0) + (State.Cleric.HitPoints > 0); });
 
 		std::cout << "threshold " << t << std::endl;
 		q.dump();
