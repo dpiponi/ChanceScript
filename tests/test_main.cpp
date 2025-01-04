@@ -5,7 +5,7 @@
 TEST(ChanceScript, test1) {
   auto d = roll(6);
   double total = 0.0;
-  for (auto [x, p] : d.pdf)
+  for (auto [x, p] : d.PDF)
   {
     total += p;
   }
@@ -22,7 +22,7 @@ TEST(ChanceScript, test2) {
       };
     }, 2);
 
-  for (auto [x, p] : d.pdf)
+  for (auto [x, p] : d.PDF)
   {
     EXPECT_FLOAT_EQ(p, std::min(x + 1, 11 - x) / 36.);
   }
@@ -31,7 +31,7 @@ TEST(ChanceScript, test2) {
 TEST(ChanceScript, test3) {
   auto d = roll(6).transform([](int x) { return 5 - (x - 1) / 2; });
 
-  for (auto [x, p] : d.pdf)
+  for (auto [x, p] : d.PDF)
   {
     EXPECT_FLOAT_EQ(p, 1 / 3.);
   }
@@ -44,7 +44,7 @@ TEST(ChanceScript, test4) {
     });
   });
 
-  for (auto [x, p] : r.pdf) {
+  for (auto [x, p] : r.PDF) {
     EXPECT_FLOAT_EQ(p, std::min(x - 1, 13 - x) / 36.0);
   }
 }

@@ -26,15 +26,7 @@ struct FAtom
 };
 
 template <typename P, typename T>
-struct dist;
-
-#if 0
-template<typename P, typename T, typename F>
-std::invoke_result_t<F, T> then(const dist<P, T> &m, const F& f);
-
-template<typename P, typename T, typename F>
-dist<P, std::invoke_result_t<F, T>> fmap(const dist<P, T> &m, const F& f);
-#endif
+struct TDist;
 
 template <typename T1, typename T2>
 using AddResultType = decltype(std::declval<T1>() + std::declval<T2>());
@@ -43,21 +35,21 @@ template <typename T1, typename T2>
 using TimesResultType = decltype(std::declval<T1>() * std::declval<T2>());
 
 template <typename P, typename T>
-struct dist
+struct TDist
 {
-	dist(std::initializer_list<FAtom<P, T>> pdf_in)
-		: pdf(pdf_in)
+	TDist(std::initializer_list<FAtom<P, T>> InPDF)
+		: PDF(InPDF)
 	{
 	}
 
 	template <typename U>
-	dist<P, AddResultType<T, U>> operator+(const dist<P, U>& other) const
+	TDist<P, AddResultType<T, U>> operator+(const TDist<P, U>& other) const
 	{
 		return and_then([&other](int x) { return other.transform([x](int y) { return x + y; }); });
 	}
 
 	template <typename U>
-	dist<P, AddResultType<T, U>> operator+(const U& other) const
+	TDist<P, AddResultType<T, U>> operator+(const U& other) const
 	{
 		return transform([&other](int x) { return x + other; });
 	}
@@ -65,7 +57,7 @@ struct dist
 	void combine()
 	{
 		std::vector<FAtom<P, T>> combined;
-		for (const auto& FAtom : pdf)
+		for (const auto& FAtom : PDF)
 		{
 			if (!combined.empty() && combined.back().Value == FAtom.Value)
 			{
@@ -77,22 +69,22 @@ struct dist
 			}
 		}
 
-		pdf = std::move(combined);
+		PDF = std::move(combined);
 	}
 
-	void sort() { std::sort(pdf.begin(), pdf.end()); }
+	void sort() { std::sort(PDF.begin(), PDF.end()); }
 
 	void remove_zero()
 	{
-		pdf.erase(std::remove_if(pdf.begin(), pdf.end(),
+		PDF.erase(std::remove_if(PDF.begin(), PDF.end(),
 					  [](const FAtom<P, T>& p) { return p.Prob == 0; }),
-			pdf.end());
+			PDF.end());
 	}
 
 	void chop(P eps)
 	{
-		pdf.erase(std::remove_if(pdf.begin(), pdf.end(), [eps](const FAtom<P, T>& p) { return abs(p.Prob) < eps; }),
-			pdf.end());
+		PDF.erase(std::remove_if(PDF.begin(), PDF.end(), [eps](const FAtom<P, T>& p) { return abs(p.Prob) < eps; }),
+			PDF.end());
 	}
 
 	void canonicalise()
@@ -106,13 +98,13 @@ struct dist
 	std::invoke_result_t<F, T> and_then(const F& f) const
 	{
 		std::invoke_result_t<F, T> result{};
-		for (const auto& x : pdf)
+		for (const auto& x : PDF)
 		{
 			auto   fx = f(x.Value);
 			double Prob = x.Prob;
-			for (auto& r : fx.pdf)
+			for (auto& r : fx.PDF)
 			{
-				result.pdf.push_back(FAtom{ r.Value, Prob * r.Prob });
+				result.PDF.push_back(FAtom{ r.Value, Prob * r.Prob });
 			}
 		}
 
@@ -122,13 +114,13 @@ struct dist
 	}
 
 	template <typename F>
-	dist<P, std::invoke_result_t<F, T>> transform(const F& f) const
+	TDist<P, std::invoke_result_t<F, T>> transform(const F& f) const
 	{
-		dist<P, std::invoke_result_t<F, T>> result{};
-		for (const auto& x : pdf)
+		TDist<P, std::invoke_result_t<F, T>> result{};
+		for (const auto& x : PDF)
 		{
 			auto fx = f(x.Value);
-			result.pdf.push_back(FAtom{ fx, x.Prob });
+			result.PDF.push_back(FAtom{ fx, x.Prob });
 		}
 
 		result.canonicalise();
@@ -146,7 +138,7 @@ struct dist
 	{
 		double total = 0.0;
 
-		for (const auto& [Value, Prob] : pdf)
+		for (const auto& [Value, Prob] : PDF)
 		{
 			total += Prob;
 		}
@@ -156,29 +148,29 @@ struct dist
 
 	void dump() const
 	{
-		for (const auto& [Value, Prob] : pdf)
+		for (const auto& [Value, Prob] : PDF)
 		{
 			std::cout << Value << ": " << Prob << std::endl;
 		}
 	}
 
-	std::vector<FAtom<P, T>> pdf;
+	std::vector<FAtom<P, T>> PDF;
 };
 
 template <typename P, typename T, typename U>
-dist<P, AddResultType<T, U>> operator+(const T& t, const dist<P, U>& du)
+TDist<P, AddResultType<T, U>> operator+(const T& t, const TDist<P, U>& du)
 {
 	return du.transform([t](const U& u) { return t + u; });
 }
 
 template <typename P, typename T, typename U>
-dist<P, TimesResultType<T, U>> operator*(const T& t, const dist<P, U>& du)
+TDist<P, TimesResultType<T, U>> operator*(const T& t, const TDist<P, U>& du)
 {
 	return du.transform([t](const U& u) { return t * u; });
 }
 
 template <typename X>
-using ddist = dist<double, X>;
+using TDDist = TDist<double, X>;
 
 template <typename P = double, typename T>
 std::ostream& operator<<(std::ostream& os, const FAtom<P, T>& FAtom)
@@ -210,28 +202,28 @@ void sort_and_combine(std::vector<FAtom<P, T>>& atoms)
 }
 
 template <typename P = double, typename T>
-dist<P, T> certainly(const T& t)
+TDist<P, T> certainly(const T& t)
 {
-	return dist<P, T>{ { t, 1.0 } };
+	return TDist<P, T>{ { t, 1.0 } };
 }
 
 template <typename P = double>
-dist<P, int> roll(int n)
+TDist<P, int> roll(int n)
 {
-	dist<P, int> result{};
-	result.pdf.resize(n);
+	TDist<P, int> result{};
+	result.PDF.resize(n);
 	for (int i = 0; i < n; ++i)
 	{
-		result.pdf[i] = FAtom{ i + 1, 1. / n };
+		result.PDF[i] = FAtom{ i + 1, 1. / n };
 	}
 
 	return result;
 }
 
 template <typename P = double>
-dist<P, int> roll(int r, int n)
+TDist<P, int> roll(int r, int n)
 {
-	dist<P, int> d = certainly(0);
+	TDist<P, int> d = certainly(0);
 	for (int i = 0; i < r; ++i)
 	{
 		d = d + roll(n);
@@ -277,10 +269,10 @@ X sum(const std::vector<X>& v)
 // Eg. if `compare` is `std::greater` it keeps the greatest rolls
 // in the usual sense.
 template <typename P, typename X, typename Compare = std::greater<X>>
-dist<P, std::vector<X>> highest_n(const dist<P, X>& dst, int roll, int keep,
+TDist<P, std::vector<X>> highest_n(const TDist<P, X>& dst, int roll, int keep,
 	Compare compare = std::greater<X>())
 {
-	dist<P, std::vector<X>> so_far(certainly(std::vector<X>{}));
+	TDist<P, std::vector<X>> so_far(certainly(std::vector<X>{}));
 
 	for (int i = 0; i < roll; ++i)
 	{
@@ -327,14 +319,14 @@ void test1()
 #else
 	auto r = roll(6) >> [](int x) { return roll(6) >> [=](int y) { return certainly(x + y); }; };
 #endif
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << z << std::endl;
 	}
 }
 
 template <typename P = double, typename T>
-dist<P, std::vector<T>> sequence(const std::vector<dist<P, T>>& dists,
+TDist<P, std::vector<T>> sequence(const std::vector<TDist<P, T>>& dists,
 	int															starting_from = 0)
 {
 	if (starting_from >= dists.size())
@@ -349,7 +341,7 @@ dist<P, std::vector<T>> sequence(const std::vector<dist<P, T>>& dists,
 }
 
 template <typename P = double, typename T, typename F>
-dist<P, T> fold(const F& f, const T& init, const std::vector<dist<P, T>>& dists,
+TDist<P, T> fold(const F& f, const T& init, const std::vector<TDist<P, T>>& dists,
 	int starting_from = 0)
 {
 	if (starting_from >= dists.size())
@@ -377,20 +369,20 @@ namespace cs
 } // namespace cs
 
 template <typename P = double, typename T, typename U, typename F>
-dist<P, T> repeated(const F& f, const T& init, const dist<P, U>& dist, int n)
+TDist<P, T> repeated(const F& f, const T& init, const TDist<P, U>& TDist, int n)
 {
 	if (n <= 0)
 	{
 		return certainly(init);
 	}
 
-	return repeated(f, init, dist, n - 1) >> [&](int head) { return dist >> [&](int tail) { return certainly(f(head, tail)); }; };
+	return repeated(f, init, TDist, n - 1) >> [&](int head) { return TDist >> [&](int tail) { return certainly(f(head, tail)); }; };
 }
 
 // Roll n times using distribution `d` and fold
 // the resutls together using `f`.
 template <typename P, typename F, typename T>
-dist<P, T> reduce(int n, const F& f, dist<P, T>& d)
+TDist<P, T> reduce(int n, const F& f, TDist<P, T>& d)
 {
 	auto e = d;
 	for (int i = 1; i < n; ++i)
@@ -403,9 +395,9 @@ dist<P, T> reduce(int n, const F& f, dist<P, T>& d)
 
 void test2()
 {
-	std::vector<dist<double, int>> rolls{ roll(6), roll(6), roll(6), roll(6) };
-	dist<double, std::vector<int>> r = sequence(rolls);
-	for (auto z : r.pdf)
+	std::vector<TDist<double, int>> rolls{ roll(6), roll(6), roll(6), roll(6) };
+	TDist<double, std::vector<int>> r = sequence(rolls);
+	for (auto z : r.PDF)
 	{
 		std::cout << z << std::endl;
 	}
@@ -413,18 +405,18 @@ void test2()
 
 void test3()
 {
-	dist<double, int> r =
+	TDist<double, int> r =
 		repeated([](int x, int y) { return std::max(x, y); }, 0, roll(6), 50);
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << z << std::endl;
 	}
 }
 
 template <typename P = double, typename X, typename F>
-dist<P, X> iterate(const X& init, const F& f, int n)
+TDist<P, X> iterate(const X& init, const F& f, int n)
 {
-	dist<double, X> r = certainly(init);
+	TDist<double, X> r = certainly(init);
 	for (int i = 0; i < n; ++i)
 	{
 		r = r >> f;
@@ -446,7 +438,7 @@ void test4()
 			return roll(6) >> [&xy](int t) { return certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
 		},
 		3);
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << z.Value.x << ' ' << z.Value.y << ' ' << z.Prob << std::endl;
 	}
@@ -467,14 +459,14 @@ void test4a()
 			return roll(6) >> [&xy](int t) { return certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
 		};
 	}
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << z.Value.x << ' ' << z.Value.y << ' ' << z.Prob << std::endl;
 	}
 }
 
 template <typename P = double, typename F, typename... FArgs>
-dist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
+TDist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 {
 	if (n == 0)
 	{
@@ -485,7 +477,7 @@ dist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 }
 
 template <typename P = double, typename... FArgs>
-dist<P, std::tuple<FArgs...>> certainly_all(FArgs... Args)
+TDist<P, std::tuple<FArgs...>> certainly_all(FArgs... Args)
 {
 	return certainly(std::tuple<FArgs...>(Args...));
 }
@@ -498,7 +490,7 @@ void test5()
 		},
 		3, 0, 0);
 
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << std::get<0>(z.Value) << ' ' << z.Prob << std::endl;
 	}
@@ -523,7 +515,7 @@ struct Character
 };
 
 template <typename P = double>
-dist<P, Character> attacks(const Character& player, const Character& monster)
+TDist<P, Character> attacks(const Character& player, const Character& monster)
 {
 	if (player.hit_points > 0)
 	{
@@ -550,7 +542,7 @@ void test6()
 			};
 		},
 		100, player, monster);
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << std::get<0>(z.Value).hit_points << ' '
 				  << std::get<1>(z.Value).hit_points << ' ' << z.Prob << std::endl;
@@ -559,7 +551,7 @@ void test6()
 
 // Roll d6 `r` times but keep top `k`.
 template <typename P = double>
-dist<P, std::vector<int>> roll_keep(int r, int k)
+TDist<P, std::vector<int>> roll_keep(int r, int k)
 {
 	if (r == 0)
 	{
@@ -600,7 +592,7 @@ namespace cs
 void test7()
 {
 	auto r = roll_keep(8, 4).transform(cs::sum);
-	for (auto z : r.pdf)
+	for (auto z : r.PDF)
 	{
 		std::cout << z.Value << ' ' << z.Prob << std::endl;
 	}
@@ -614,20 +606,20 @@ int main()
 #endif
 
 template <typename P, typename T>
-bool subdist(const dist<P, T>& a, const dist<P, T>& b)
+bool subdist(const TDist<P, T>& a, const TDist<P, T>& b)
 {
 	int i = 0;
 	int j = 0;
-	while (i < a.pdf.size() && j < b.pdf.size())
+	while (i < a.PDF.size() && j < b.PDF.size())
 	{
-		if (a.pdf[i].Value < b.pdf[i].Value)
+		if (a.PDF[i].Value < b.PDF[i].Value)
 		{
 			return false;
 		}
 		++i;
 		++j;
 	}
-	return i < a.pdf.size();
+	return i < a.PDF.size();
 }
 
 // using Prob = double;
@@ -699,12 +691,12 @@ struct setup
 };
 
 template <typename P = double, typename X>
-dist<P, X> convert_to_pdf(setup<P, X>* s, const std::vector<P>& v)
+TDist<P, X> convert_to_pdf(setup<P, X>* s, const std::vector<P>& v)
 {
-	dist<P, X> d{};
+	TDist<P, X> d{};
 	for (int i = 0; i < v.size(); ++i)
 	{
-		d.pdf.emplace_back(s->values[i], v[i]);
+		d.PDF.emplace_back(s->values[i], v[i]);
 	}
 	d.sort();
 	d.remove_zero();
@@ -726,9 +718,9 @@ setup<P, X>* build_matrix(const X& x, const F& f)
 	sparse_vector<P> row;
 	while (next_value_to_process < values_to_process.size())
 	{
-		dist<P, X> r = f(values_to_process[next_value_to_process]);
+		TDist<P, X> r = f(values_to_process[next_value_to_process]);
 		row.clear();
-		for (auto& [Value, Prob] : r.pdf)
+		for (auto& [Value, Prob] : r.PDF)
 		{
 			if (labels.contains(Value))
 			{
@@ -751,14 +743,14 @@ setup<P, X>* build_matrix(const X& x, const F& f)
 }
 
 template <typename P = double, typename X, typename F>
-dist<P, X> iterate_i(const X& init, const F& f, int n)
+TDist<P, X> iterate_i(const X& init, const F& f, int n)
 {
-	dist<P, X> r = certainly(init);
+	TDist<P, X> r = certainly(init);
 	for (int i = 0; i < n; ++i)
 	{
 		const auto old_r = r;
 		r = old_r >> f;
-		std::cout << old_r.pdf.size() << '/' << r.pdf.size() << std::endl;
+		std::cout << old_r.PDF.size() << '/' << r.PDF.size() << std::endl;
 		if (subdist(r, old_r))
 		{
 			std::cout << "Explored" << std::endl;
@@ -768,7 +760,7 @@ dist<P, X> iterate_i(const X& init, const F& f, int n)
 }
 
 template <typename P = double, typename X, typename F>
-dist<P, X> iterate_matrix_i(const X& init, const F& f, int n)
+TDist<P, X> iterate_matrix_i(const X& init, const F& f, int n)
 {
 	setup<P, X>* s = build_matrix<P>(init, f);
 	// dump_matrix(s->m);
@@ -794,7 +786,7 @@ X update(const X& x, Y(X::* y), const Y& y_new)
 }
 
 template <typename P = double, typename X, typename Y>
-dist<P, X> updateP(const X& x, Y(X::* y), const dist<P, Y>& ys_new)
+TDist<P, X> updateP(const X& x, Y(X::* y), const TDist<P, Y>& ys_new)
 {
 	return ys_new >> [&](const Y& y_new) {
 		X x_copy(x);
