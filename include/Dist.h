@@ -181,6 +181,21 @@ template<typename ProbType, typename ValueType> struct TDist
         }
     }
 
+    const std::vector<FAtom<ProbType, ValueType>>& GetPDF() const
+    {
+        return PDF;
+    }
+
+    auto begin() const
+    {
+        return PDF.begin();
+    }
+
+    auto end() const
+    {
+        return PDF.end();
+    }
+
     std::vector<FAtom<ProbType, ValueType>> PDF;
 };
 
