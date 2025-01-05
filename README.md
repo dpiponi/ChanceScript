@@ -95,3 +95,51 @@ int main()
     }
 }
 ```
+
+A more complex example is starting with some number, say 1000, and counting how many rolls of a die we have to subtract before hitting zero. One challenge here is that if we work iteratively we have two variables: the number we are counting down from and the number of rolls so far. At any step we can't treat these two variables independently as there is a non-trivial joint distribution on the pair. So our iteration involves a distribution on a state of type `std::pair<int, int>`. Note, however, that this code is reasonably fast. The number of ways to roll a sequence of dice until we hit zero is unimaginably large but we don't need to explore all of this space to get an answer.
+```
+#include <iostream>
+
+#include "ChanceScript.h"
+
+auto TimeToHitZero(int N)
+{
+    auto Dist = certainly(std::make_pair(N, 0));
+
+    for (int T = 0; T < N; ++T)
+    {
+        Dist = Dist.AndThen(
+            [](const auto& State)
+            {
+                auto [N, Count] = State;
+                if (N <= 0)
+                {
+                    return certainly(std::make_pair(0, Count));
+                }
+                else
+                {
+                    return Roll(6).Transform(
+                        [N, Count](int Value)
+                        {
+                            return std::make_pair(std::max(0, N - Value),
+                                                  Count + 1);
+                        });
+                }
+            });
+    }
+
+    return Dist.Transform([](const auto& State) { return std::get<1>(State); });
+}
+
+int main()
+{
+    const int Start = 1000;
+    auto      Dist = TimeToHitZero(Start);
+
+    for (auto [Value, Prob] : Dist)
+    {
+        std::cout << "The probability of taking " << Value << " steps is "
+                  << Prob << std::endl;
+    }
+}
+```
