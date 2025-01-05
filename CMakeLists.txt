@@ -25,6 +25,7 @@ target_include_directories(ChanceScript INTERFACE include)
 add_executable(ex1 src/ex1.cpp)
 add_executable(ex2 src/ex2.cpp)
 add_executable(ex3 src/ex3.cpp)
+add_executable(ex4 src/ex4.cpp)
 add_executable(interpret src/interpret.cpp)
 
 target_link_libraries(ex1 PRIVATE ChanceScript)
