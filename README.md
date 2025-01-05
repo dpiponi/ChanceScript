@@ -104,31 +104,38 @@ A more complex example is starting with some number, say 1000, and counting how 
 
 auto TimeToHitZero(int N)
 {
-    auto Dist = certainly(std::make_pair(N, 0));
+    struct FState
+    {
+        int N;
+        int Count;
+
+        auto operator<=>(const FState& Other) const = default;
+    };
+
+    auto Dist = certainly(FState{ N, 0 });
 
     for (int T = 0; T < N; ++T)
     {
         Dist = Dist.AndThen(
             [](const auto& State)
             {
-                auto [N, Count] = State;
-                if (N <= 0)
+                if (State.N <= 0)
                 {
-                    return certainly(std::make_pair(0, Count));
+                    return certainly(State);
                 }
                 else
                 {
                     return Roll(6).Transform(
-                        [N, Count](int Value)
+                        [&State](int Value)
                         {
-                            return std::make_pair(std::max(0, N - Value),
-                                                  Count + 1);
+                            return FState{ std::max(0, State.N - Value),
+                                           State.Count + 1 };
                         });
                 }
             });
     }
 
-    return Dist.Transform([](const auto& State) { return std::get<1>(State); });
+    return Dist.Transform([](const auto& State) { return State.Count; });
 }
 
 int main()
