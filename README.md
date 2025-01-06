@@ -3,6 +3,8 @@ ChanceScript
 
 ChanceScript is a small C++ library supporting probabilistic programming.  This design is modelled on Haskell monads. Monadic programming isn't the easiest approach to programming in C++ but there is some precedent, for example in the use of `.transform` and `and_then` in the interface for `std::optional`. In fact, this code uses this interface (but renamed to `.Transform` and `.AndThen` as I'm using something close to Epic Games style.)
 
+It's not clear C++ is a reasonable language for this as it stands so consider this all very experimental...
+
 Here is a small example program:
 
 ```
@@ -118,6 +120,8 @@ int main()
 ```
 
 A more complex example is starting with some number, say 1000, and counting how many rolls of a die we have to subtract before hitting zero. One challenge here is that if we work iteratively we have two variables: the number we are counting down from and the number of rolls so far. At any step we can't treat these two variables independently as there is a non-trivial joint distribution on the pair. So our iteration involves a distribution on a state of type `std::pair<int, int>` or a custom type. Note, however, that this code is reasonably fast. The number of ways to roll a sequence of dice until we hit zero is unimaginably large but we don't need to explore all of this space to get an answer.
+
+Note that internally the `TDist<>` template keeps elements sorted so we need a definition of the spaceship operator `<=>`.
 ```
 #include <iostream>
 
