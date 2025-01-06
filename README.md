@@ -66,9 +66,30 @@ auto X = Roll(6);
 auto Y = Roll(6);
 auto Z = F(X, Y);
 ```
-where `F` is some mathematical function. But `X` and `Y` are distributions, not values, so we can't apply ordinary mathematical functions directly. Note in particular that in order to tabulate probabilities the library needs to iterate through all possible values, so somehow the function `F` needs to be called with all 36 combinations of rolls of two dice. There is no way to implement this with code looking like the snippet above. (In Haskell, through the magic of monads the 'remainder' of a block of imperative code is just a function so we can call it as many times as we like with whatever values we like.)
+where `F` is some mathematical function. But `X` and `Y` are distributions, not values, so we can't apply ordinary mathematical functions directly. Note in particular that in order to tabulate probabilities the library needs to iterate through all possible values, so somehow the function `F` needs to be called with all 36 combinations of rolls of two dice. There is no way to implement this with code looking like the snippet above. (In Haskell, through the magic of monads, the 'remainder' of a block of imperative code is just a function so we can call it as many times as we like with whatever values we like.)
 
-Instead we can write:
+In order to chain random operations we use `.AndThen()`. This is similar to `.Transform()` except that for each of the values passed into the provided lambda a _distribution_ is returned. There is also a special distribution that is concentrated on one value, `Certainly(Value)`. This means that the following code snippets are equivalent:
+
+```
+Dist.Transform([](...)
+{
+    ...;
+    return Result;
+})
+```
+```
+Dist.AndThen([](...)
+{
+    ...;
+    return Certainly(Result);
+}
+```
+But of course `.AndThen()` can return any distribution, not just `Certainly(...)`.
+
+Note that `.AndThen()` corresponds to Haskell's `>>=`, `.Transform()` corresponds to `fmap` and `Certainly` corresponds to `return`.
+
+We can now write:
+
 ```
 #include <iostream>
 
@@ -112,7 +133,7 @@ auto TimeToHitZero(int N)
         auto operator<=>(const FState& Other) const = default;
     };
 
-    auto Dist = certainly(FState{ N, 0 });
+    auto Dist = Certainly(FState{ N, 0 });
 
     for (int T = 0; T < N; ++T)
     {
@@ -121,7 +142,7 @@ auto TimeToHitZero(int N)
             {
                 if (State.N <= 0)
                 {
-                    return certainly(State);
+                    return Certainly(State);
                 }
                 else
                 {

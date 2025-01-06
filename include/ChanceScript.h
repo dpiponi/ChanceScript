@@ -11,7 +11,7 @@
 #include "Utilities.h"
 #include "Dist.h"
 
-template <typename P = double, typename T> TDist<P, T> certainly(const T& t)
+template <typename P = double, typename T> TDist<P, T> Certainly(const T& t)
 {
     return TDist<P, T>{ { t, 1.0 } };
 }
@@ -30,7 +30,7 @@ template <typename P = double> TDist<P, int> Roll(int n)
 
 template <typename P = double> TDist<P, int> Roll(int r, int n)
 {
-    TDist<P, int> d = certainly(0);
+    TDist<P, int> d = Certainly(0);
     for (int i = 0; i < r; ++i)
     {
         d = d + Roll(n);
@@ -78,7 +78,7 @@ template <typename P, typename X, typename Compare = std::greater<X>>
 TDist<P, std::vector<X>> highest_n(const TDist<P, X>& dst, int Roll, int keep,
                                    Compare compare = std::greater<X>())
 {
-    TDist<P, std::vector<X>> so_far(certainly(std::vector<X>{}));
+    TDist<P, std::vector<X>> so_far(Certainly(std::vector<X>{}));
 
     for (int i = 0; i < Roll; ++i)
     {
@@ -105,7 +105,7 @@ TDist<P, std::vector<X>> highest_n(const TDist<P, X>& dst, int Roll, int keep,
 
 #define DO(b) [&]() { b; }();
 #define LET(v, e, b) return e.AndThen([&](v) { b; })
-#define RETURN(x) return certainly(x)
+#define RETURN(x) return Certainly(x)
 
 // Function to concatenate two vectors and return the result
 template <typename T>
@@ -129,7 +129,7 @@ void test1()
                )));
 #else
     auto r = Roll(6) >> [](int x)
-    { return Roll(6) >> [=](int y) { return certainly(x + y); }; };
+    { return Roll(6) >> [=](int y) { return Certainly(x + y); }; };
 #endif
     for (auto z : r.PDF)
     {
@@ -143,7 +143,7 @@ TDist<P, std::vector<T>> sequence(const std::vector<TDist<P, T>>& dists,
 {
     if (starting_from >= dists.size())
     {
-        return certainly(std::vector<T>{});
+        return Certainly(std::vector<T>{});
     }
 
     return DO(LET(const T& head,
@@ -159,7 +159,7 @@ TDist<P, T> fold(const F& f, const T& init,
 {
     if (starting_from >= dists.size())
     {
-        return certainly(init);
+        return Certainly(init);
     }
 
     return DO(LET(const T& head,
@@ -186,11 +186,11 @@ TDist<P, T> repeated(const F& f, const T& init, const TDist<P, U>& TDist, int n)
 {
     if (n <= 0)
     {
-        return certainly(init);
+        return Certainly(init);
     }
 
     return repeated(f, init, TDist, n - 1) >> [&](int head)
-    { return TDist >> [&](int tail) { return certainly(f(head, tail)); }; };
+    { return TDist >> [&](int tail) { return Certainly(f(head, tail)); }; };
 }
 
 // Roll n times using distribution `d` and fold
@@ -231,7 +231,7 @@ void test3()
 template <typename P = double, typename X, typename F>
 TDist<P, X> iterate(const X& init, const F& f, int n)
 {
-    TDist<double, X> r = certainly(init);
+    TDist<double, X> r = Certainly(init);
     for (int i = 0; i < n; ++i)
     {
         r = r >> f;
@@ -252,7 +252,7 @@ void test4()
         [](const auto& xy)
         {
             return Roll(6) >> [&xy](int t)
-            { return certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
+            { return Certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
         },
         3);
     for (auto z : r.PDF)
@@ -270,13 +270,13 @@ void test4a()
         int  y;
         auto operator<=>(const X&) const = default;
     };
-    auto r = certainly(X{ 0, 0 });
+    auto r = Certainly(X{ 0, 0 });
     for (int i = 0; i < 4; ++i)
     {
         r = r >> [](const auto& xy)
         {
             return Roll(6) >> [&xy](int t)
-            { return certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
+            { return Certainly(X{ 10 * xy.x + t, 100 * xy.y + t }); };
         };
     }
     for (auto z : r.PDF)
@@ -291,7 +291,7 @@ TDist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 {
     if (n == 0)
     {
-        return certainly(std::tuple<FArgs...>(Args...));
+        return Certainly(std::tuple<FArgs...>(Args...));
     }
     return iterate_all(f, n - 1, Args...) >>
            [f](const std::tuple<FArgs...> ArgsTuple)
@@ -299,9 +299,9 @@ TDist<P, std::tuple<FArgs...>> iterate_all(const F& f, int n, FArgs... Args)
 }
 
 template <typename P = double, typename... FArgs>
-TDist<P, std::tuple<FArgs...>> certainly_all(FArgs... Args)
+TDist<P, std::tuple<FArgs...>> Certainly_all(FArgs... Args)
 {
-    return certainly(std::tuple<FArgs...>(Args...));
+    return Certainly(std::tuple<FArgs...>(Args...));
 }
 
 void test5()
@@ -310,7 +310,7 @@ void test5()
         [](int x, int y)
         {
             return Roll(6) >> [=](int t)
-            { return certainly_all(10 * x + t, 100 * y + t); };
+            { return Certainly_all(10 * x + t, 100 * y + t); };
         },
         3,
         0,
@@ -348,13 +348,13 @@ TDist<P, Character> attacks(const Character& player, const Character& monster)
         return Roll(20) >> [=](int player_hit_roll)
         {
             return player_hit_roll >= 11 ? Roll(6) >> [=](int player_damage)
-            { return certainly(monster.damage(player_damage)); }
-                                         : certainly(monster);
+            { return Certainly(monster.damage(player_damage)); }
+                                         : Certainly(monster);
         };
     }
     else
     {
-        return certainly(monster);
+        return Certainly(monster);
     }
 }
 
@@ -369,7 +369,7 @@ void test6()
             return attacks(player, monster) >> [=](const Character& monster)
             {
                 return attacks(monster, player) >> [=](const Character& player)
-                { return certainly_all(player, monster); };
+                { return Certainly_all(player, monster); };
             };
         },
         100,
@@ -389,7 +389,7 @@ TDist<P, std::vector<int>> roll_keep(int r, int k)
 {
     if (r == 0)
     {
-        return certainly(std::vector<int>{});
+        return Certainly(std::vector<int>{});
     }
     else
     {
@@ -404,7 +404,7 @@ TDist<P, std::vector<int>> roll_keep(int r, int k)
                 {
                     new_rolls.resize(k);
                 }
-                return certainly(new_rolls);
+                return Certainly(new_rolls);
             };
         };
     }
@@ -608,7 +608,7 @@ template <typename P> P MinDiagonal(const TMatrix<P>& Matrix)
 template <typename P = double, typename X, typename F>
 TDist<P, X> iterate_i(const X& init, const F& f, int n)
 {
-    TDist<P, X> r = certainly(init);
+    TDist<P, X> r = Certainly(init);
     for (int i = 0; i < n; ++i)
     {
         const auto old_r = r;

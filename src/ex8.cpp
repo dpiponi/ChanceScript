@@ -12,7 +12,7 @@ auto TimeToHitZero(int N)
         auto operator<=>(const FState& Other) const = default;
     };
 
-    auto Dist = certainly(FState{ N, 0 });
+    auto Dist = Certainly(FState{ N, 0 });
 
     for (int T = 0; T < N; ++T)
     {
@@ -21,7 +21,7 @@ auto TimeToHitZero(int N)
             {
                 if (State.N <= 0)
                 {
-                    return certainly(State);
+                    return Certainly(State);
                 }
                 else
                 {

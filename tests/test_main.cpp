@@ -18,7 +18,7 @@ TEST(ChanceScript, test2) {
   auto d = iterate_matrix_i(
     x, [](const int x) {
       return Roll(6) >> [x](const int reduction) {
-        return certainly(std::max(0, x - reduction));
+        return Certainly(std::max(0, x - reduction));
       };
     }, 2);
 

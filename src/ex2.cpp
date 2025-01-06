@@ -107,12 +107,12 @@ struct FState
                     {
                         return bAttackerHits
                                    ? DoHitP(DamageRoll, Attacker, Defender)
-                                   : certainly(Defender);
+                                   : Certainly(Defender);
                     });
         }
         else
         {
-            return certainly(Defender);
+            return Certainly(Defender);
         }
     }
 
@@ -150,7 +150,7 @@ TDDist<FState> FFighter::DoMove(const FState& State) const
     }
     else
     {
-        return certainly(State);
+        return Certainly(State);
     }
 }
 
@@ -196,7 +196,7 @@ TDDist<FState> FCleric::DoMove(const FState& State) const
     }
     else
     {
-        return certainly(State);
+        return Certainly(State);
     }
 }
 
@@ -219,7 +219,7 @@ TDDist<FState> FOgre::DoMove(const FState& State) const
     }
     else
     {
-        return certainly(State);
+        return Certainly(State);
     }
 }
 
