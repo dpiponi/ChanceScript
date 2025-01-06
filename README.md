@@ -7,7 +7,7 @@ It's not clear C++ is a reasonable language for this as it stands so consider th
 
 Here is a small example program:
 
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
