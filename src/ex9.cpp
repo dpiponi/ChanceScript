@@ -44,8 +44,7 @@ auto RandomWalk(int N)
 
 int main()
 {
-    const int Start = 100;
-    auto      Dist = RandomWalk(Start);
+    auto Dist = RandomWalk(100);
 
     for (auto [Value, Prob] : Dist)
     {
