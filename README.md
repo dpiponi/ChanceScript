@@ -26,7 +26,7 @@ int main()
 
 Operators are overloaded so we can sum two rolls like so:
 
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
@@ -44,7 +44,7 @@ int main()
 ```
 
 Besides using operator overloads we can transform the elements of a probability distribution using a lambda and it will update the probabilities accordingly:
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
@@ -63,7 +63,7 @@ int main()
 
 Under the hood the library needs to explore all possibilities so it can tabulate the results. This leads to a programming challenge. We'd like to be able to write code like so:
 
-```
+```C++
 auto X = Roll(6);
 auto Y = Roll(6);
 auto Z = F(X, Y);
@@ -72,14 +72,14 @@ where `F` is some mathematical function. But `X` and `Y` are distributions, not 
 
 In order to chain random operations we use `.AndThen()`. This is similar to `.Transform()` except that for each of the values passed into the provided lambda a _distribution_ is returned. There is also a special distribution that is concentrated on one value, `Certainly(Value)`. This means that the following code snippets are equivalent:
 
-```
+```C++
 Dist.Transform([](...)
 {
     ...;
     return Result;
 })
 ```
-```
+```C++
 Dist.AndThen([](...)
 {
     ...;
@@ -92,7 +92,7 @@ Note that `.AndThen()` corresponds to Haskell's `>>=`, `.Transform()` correspond
 
 We can now write:
 
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
@@ -122,7 +122,7 @@ int main()
 A more complex example is starting with some number, say 1000, and counting how many rolls of a die we have to subtract before hitting zero. One challenge here is that if we work iteratively we have two variables: the number we are counting down from and the number of rolls so far. At any step we can't treat these two variables independently as there is a non-trivial joint distribution on the pair. So our iteration involves a distribution on a state of type `std::pair<int, int>` or a custom type. Note, however, that this code is reasonably fast. The number of ways to roll a sequence of dice until we hit zero is unimaginably large but we don't need to explore all of this space to get an answer.
 
 Note that internally the `TDist<>` template keeps elements sorted so we need a definition of the spaceship operator `<=>`.
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
@@ -177,7 +177,7 @@ int main()
 ```
 
 Here's an example showing how it is possible to write simulations:
-```
+```C++
 #include <iostream>
 
 #include "ChanceScript.h"
