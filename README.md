@@ -244,6 +244,6 @@ I have much faster code for certain operations that isn't yet incorporated into 
 
 There is also unpolished code for special operations like computing the result of certain simulations with absorbing states in the limit as the number of steps goes to infinity.
 
-In almost every case it isn't hard to hand-craft code that solves the same problem maybe 10,000x faster. For example the random walk example compare with [code I wrote at Google](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/experimental/marginalize/marginalizable_test.py). But the important thing about this code is that it's a *forward* simulation whereas hand-crafted code tends to be written backwards making it hard to leverage existing libraries.
+In almost every case it isn't hard to hand-craft code that solves the same problem maybe 10,000x faster. For example compare the random walk with [code I wrote at Google](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/experimental/marginalize/marginalizable_test.py). But the important thing about this code is that it's a *forward* simulation whereas hand-crafted code tends to be written backwards making it hard to leverage existing libraries.
 
 See `src/ex2.cpp` for a complex example simulating an AD&D 1e combat involving a spellcasting cleric and fighter against a pair of ogres.
