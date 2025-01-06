@@ -9,6 +9,21 @@
 
 struct FState;
 
+const TDDist<int> SwordDamage = Roll(8);
+const TDDist<int> MaceDamage = Roll(6) + 1;
+const TDDist<int> OgreDamage = Roll(10);
+
+const int FighterToHitAC5 = 15;
+const int ClericToHitAC5 = 15;
+
+const int FighterFullHP = 16;
+const int ClericFullHP = 12;
+
+TDDist<int> CureLightWoundsHP = Roll(8);
+
+// When does cleric self-heal?
+const int CureThreshold = 7;
+
 // Ogre AC 5, 4d+1 HP Damage d10 (MM p.75)
 //  to hit AC 2: 13
 // Cleric 2nd level, to hit AC 5: 15+. (DMG p.74)
@@ -64,6 +79,8 @@ struct FOgre : public FCharacter
     TDDist<FState> DoMove(const FState& State) const override;
 };
 
+// XXX
+// Work on dividing up responsibilities between characters and state.
 struct FState
 {
     FFighter Fighter;
@@ -79,7 +96,7 @@ struct FState
                !Fighter.IsAlive() && !Cleric.IsAlive();
     }
 
-    template <typename Prob, typename DefenderType>
+    template<typename Prob, typename DefenderType>
     static TDist<Prob, DefenderType> DoHitP(const TDist<Prob, int>& DamageRoll,
                                             const FCharacter&       Attacker,
                                             const DefenderType&     Defender)
@@ -93,13 +110,17 @@ struct FState
             });
     }
 
-    template <typename Prob, typename DefenderType>
+    template<typename Prob, typename DefenderType>
     static TDist<Prob, DefenderType>
     DoAttackP(int ToHit, const TDist<Prob, int>& DamageRoll,
               const FCharacter& Attacker, const DefenderType& Defender)
     {
         if (Attacker.HitPoints > 0)
         {
+            // Note it is more efficient to perform the `Roll(2) >= ToHit` first
+            // than put the comparison inside the `.AndThen()` as this results
+            // in the lambda in `.AndThen()` being called just twice instead
+            // of 20 times. Always reduce the space as early as possible.
             return (Roll(20) >= ToHit)
                 .AndThen(
                     [&DamageRoll, &Attacker, &Defender](
@@ -116,7 +137,7 @@ struct FState
         }
     }
 
-    template <typename AttackerType, typename DefenderType>
+    template<typename AttackerType, typename DefenderType>
     TDDist<FState> AttacksP(int ToHit, const TDDist<int>& DamageRoll,
                             const AttackerType& Attacker,
                             DefenderType(FState::* Defender)) const
@@ -126,10 +147,6 @@ struct FState
         return UpdateFieldP(*this, Defender, AttackedDefender);
     }
 };
-
-const TDDist<int> SwordDamage = Roll(8);
-const int         FighterToHitAC5 = 15;
-const int         ClericToHitAC5 = 15;
 
 TDDist<FState> FFighter::DoMove(const FState& State) const
 {
@@ -154,20 +171,12 @@ TDDist<FState> FFighter::DoMove(const FState& State) const
     }
 }
 
-int       threshold = 11;
-const int FighterFullHP = 16;
-const int ClericFullHP = 12;
-
-TDDist<int> MaceDamage = Roll(6) + 1;
-
-TDDist<int> CureLightWoundsHP = Roll(8);
-
 TDDist<FState> FCleric::DoMove(const FState& State) const
 {
     if (!State.GameOver() && HitPoints > 0)
     {
-        if (State.Cleric.HitPoints > 0 && State.Cleric.HitPoints <= threshold &&
-            NumCureLightWounds > 0)
+        if (State.Cleric.HitPoints > 0 &&
+            State.Cleric.HitPoints <= CureThreshold && NumCureLightWounds > 0)
         {
             // Cure
             return CureLightWoundsHP.Transform(
@@ -200,8 +209,6 @@ TDDist<FState> FCleric::DoMove(const FState& State) const
     }
 }
 
-TDDist<int> OgreDamage = Roll(10);
-
 TDDist<FState> FOgre::DoMove(const FState& State) const
 {
     if (!State.GameOver() && HitPoints > 0)
@@ -225,25 +232,22 @@ TDDist<FState> FOgre::DoMove(const FState& State) const
 
 void test()
 {
-    threshold = 7;
-    std::cout << "threshold = " << threshold << std::endl;
-
     FState State{
         FFighter(FighterFullHP), FCleric(ClericFullHP, 2), FOgre(19), FOgre(19)
     };
 
-#if 0
+#if 1
     TDDist<FState> r = iterate_matrix_i(
         State,
         [](const FState State)
         {
             return State.Fighter.DoMove(State)
                 .AndThen([](const FState& State)
-                          { return State.Cleric.DoMove(State); })
+                         { return State.Cleric.DoMove(State); })
                 .AndThen([](const FState& State)
-                          { return State.Ogre1.DoMove(State); })
+                         { return State.Ogre1.DoMove(State); })
                 .AndThen([](const FState& State)
-                          { return State.Ogre2.DoMove(State); });
+                         { return State.Ogre2.DoMove(State); });
         },
         50);
 #else
@@ -253,11 +257,11 @@ void test()
         {
             return State.Fighter.DoMove(State)
                 .AndThen([](const FState& State)
-                          { return State.Cleric.DoMove(State); })
+                         { return State.Cleric.DoMove(State); })
                 .AndThen([](const FState& State)
-                          { return State.Ogre1.DoMove(State); })
+                         { return State.Ogre1.DoMove(State); })
                 .AndThen([](const FState& State)
-                          { return State.Ogre2.DoMove(State); });
+                         { return State.Ogre2.DoMove(State); });
         });
 #endif
 
@@ -266,6 +270,8 @@ void test()
     auto q = r.Transform(
         [](const FState& State)
         { return State.Fighter.IsAlive() + (State.Cleric.IsAlive()); });
+
+    std::cout << "How many players survive after 50 rounds?" << std::endl;
 
     q.dump();
 }

@@ -175,3 +175,5 @@ int main()
     }
 }
 ```
+
+See `src/ex2.cpp` for a complex example simulating an AD&D 1e combat involving a spellcasting cleric and fighter against a pair of ogres.
