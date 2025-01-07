@@ -14,6 +14,26 @@ auto TimeToHitZero(int N)
 
     auto Dist = Certainly(FState{ N, 0 });
 
+    // In 'normal' code we'd write:
+    //
+    // for (int T = 0; T < N; ++T)
+    // {
+    //     if (N <= 0)
+    //     {
+    //         break;
+    //     }
+    //     else
+    //     {
+    //         int Value = Roll(6);
+    //         N -= Value;
+    //         ++Count;
+    //     }
+    // }
+
+    // We clamp N below at zero because we want to keep the state space small.
+    // No need to keep tracking the probability of every individual state with
+    // N < 0.
+
     for (int T = 0; T < N; ++T)
     {
         Dist = Dist.AndThen(
