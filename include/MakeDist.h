@@ -1,31 +1,14 @@
 #pragma once
 
-struct FEnumeratorBase
+template<typename ProbType> struct TDistSample
 {
-    virtual ~FEnumeratorBase() {}
+    TDistSample(int InSize) : Size(InSize), R(0) {}
 
-    virtual bool Next() = 0;
-    virtual void Current(void* Result, void* Prob) const = 0;
-};
+    int Current() const { return R; }
 
-template<typename ProbType, typename T>
-struct TDistSample : public FEnumeratorBase
-{
-    TDistSample(const TDist<ProbType, T>& InDist) : Dist(InDist), R(0) {}
+    bool Next() { return ++R >= Size; }
 
-    void Current(void* Address, void* Prob) const override
-    {
-        *(T*)Address = Dist.PDF[R].Value;
-        *(ProbType*)Prob = Dist.PDF[R].Prob;
-    }
-
-    bool Next() override
-    {
-        ++R;
-        return R >= Dist.PDF.size();
-    }
-
-    TDist<ProbType, T> Dist;
+    int Size;
     int R;
 };
 
@@ -49,7 +32,7 @@ template<typename ProbType> struct TExplorerBase : public FSampler
     {
         while (!EnumeratorStack.empty() > 0)
         {
-            if (EnumeratorStack.back()->Next())
+            if (EnumeratorStack.back().Next())
             {
                 EnumeratorStack.pop_back();
             }
@@ -63,26 +46,24 @@ template<typename ProbType> struct TExplorerBase : public FSampler
 
     template<typename T> T operator()(const TDist<ProbType, T>& Dist)
     {
-        T Result;
-        ProbType Prob;
+        int R;
         if (CurrentEnumerator < EnumeratorStack.size())
         {
-            EnumeratorStack[CurrentEnumerator]->Current(&Result, &Prob);
+            R = EnumeratorStack[CurrentEnumerator].Current();
         }
         else
         {
-            // XXX no need for this as `Dist` is passed in.
-            auto RollEnumerator =
-                std::make_unique<TDistSample<ProbType, T>>(Dist);
-            RollEnumerator->Current(&Result, &Prob);
+            auto RollEnumerator = TDistSample<ProbType>(Dist.PDF.size());
+            R = RollEnumerator.Current();
             EnumeratorStack.push_back(std::move(RollEnumerator));
         }
-        Importance *= Prob;
+        T Result = Dist.PDF[R].Value;
+        Importance *= Dist.PDF[R].Prob;
         ++CurrentEnumerator;
         return Result;
     }
 
-    std::vector<std::unique_ptr<FEnumeratorBase>> EnumeratorStack;
+    std::vector<TDistSample<ProbType>> EnumeratorStack;
     int CurrentEnumerator;
     ProbType Importance;
 };
