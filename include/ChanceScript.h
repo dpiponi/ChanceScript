@@ -10,6 +10,7 @@
 
 #include "Utilities.h"
 #include "Dist.h"
+#include "MakeDist.h"
 
 template <typename P = double, typename T> TDist<P, T> Certainly(const T& t)
 {
@@ -22,7 +23,7 @@ template <typename P = double> TDist<P, int> Roll(int n)
     result.PDF.resize(n);
     for (int i = 0; i < n; ++i)
     {
-        result.PDF[i] = FAtom{ i + 1, 1. / n };
+        result.PDF[i] = TAtom{ i + 1, 1. / n };
     }
 
     return result;

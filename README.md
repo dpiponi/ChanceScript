@@ -5,6 +5,8 @@ ChanceScript is a small C++ library supporting probabilistic programming.  This 
 
 It's not clear C++ is a reasonable language for this as it stands so consider this all very experimental...
 
+(One little note: at the end of the day this code is just inefficient sparse matrix code whose usefulness comes from it being very flexible in the way you can label your basis elements. A `TDist<>` object is just a sparse vector and the argument to `.AndThen()` is a representation of a sparse matrix with `.AndThen()` actually performing a vector matrix multiplication.)
+
 Here is a small example program:
 
 ```C++
@@ -61,7 +63,7 @@ int main()
 }
 ```
 
-Under the hood the library needs to explore all possibilities so it can tabulate the results. This leads to a programming challenge. We'd like to be able to write code like so:
+Under the hood the library needs to explore all[^1] possibilities so it can tabulate the results. This leads to a programming challenge. We'd like to be able to write code like so:
 
 ```C++
 auto X = Roll(6);
@@ -246,3 +248,22 @@ There is also unpolished code for special operations like computing the result o
 In almost every case it isn't hard to hand-craft code that solves the same problem maybe 10,000x faster. For example compare the random walk with [code I wrote at Google](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/experimental/marginalize/marginalizable_test.py). But the important thing about this code is that it's a *forward* simulation whereas hand-crafted code tends to be written backwards (ie. to compute the PDF at time T+1 we use the PDF at time T) making it hard to leverage existing libraries.
 
 See `src/ex2.cpp` for a complex example simulating an AD&D 1e combat involving a spellcasting cleric and fighter against a pair of ogres.
+
+FOOTNOTES
+---------
+[^1]: You can explore all states without actually visiting every individual state. For example the following code runs in time _linear_ in `N`, even without special case handling of sums via convolution. This is because at each stage it forgets how it reached the current `Total` and just rememebers what the `Total` is. You can accidentally write code that keeps the entire history in the distribution and that'll run exponentially slowly. It's always important to keep using `.Transform()` to keep only what you care about.  This footnote is probably the most important thing to know about this library's performance.
+
+```C++
+auto Dist = Certainly(0);
+for (int T = 0; T < N; ++T)
+{
+    Dist = Dist.AndThen([](int Total)
+    {
+        return Roll(6).Transform([Total](int Value)
+        {
+            return Total + Value;
+        });
+    });
+}
+```
+

@@ -1,11 +1,11 @@
 #pragma once
 
-template<typename ProbType, typename ValueType> struct FAtom
+template<typename ProbType, typename ValueType> struct TAtom
 {
     ValueType Value;
-    ProbType  Prob;
+    ProbType Prob;
 
-    auto operator<=>(const FAtom& Other) const { return Value <=> Other.Value; }
+    auto operator<=>(const TAtom& Other) const { return Value <=> Other.Value; }
 };
 
 template<typename ProbType, typename ValueType> struct TDist;
@@ -22,8 +22,14 @@ using TimesResultType =
 
 template<typename ProbType, typename ValueType> struct TDist
 {
-    TDist(std::initializer_list<FAtom<ProbType, ValueType>> InPDF) : PDF(InPDF)
+    TDist(std::initializer_list<TAtom<ProbType, ValueType>> InPDF) : PDF(InPDF)
     {
+        canonicalise();
+    }
+
+    TDist(const std::vector<TAtom<ProbType, ValueType>>& InPDF) : PDF(InPDF)
+    {
+        canonicalise();
     }
 
     // Operators
@@ -77,16 +83,16 @@ template<typename ProbType, typename ValueType> struct TDist
     // are in fact equal.
     void Merge()
     {
-        std::vector<FAtom<ProbType, ValueType>> Merged;
-        for (const auto& FAtom : PDF)
+        std::vector<TAtom<ProbType, ValueType>> Merged;
+        for (const auto& TAtom : PDF)
         {
-            if (!Merged.empty() && Merged.back().Value == FAtom.Value)
+            if (!Merged.empty() && Merged.back().Value == TAtom.Value)
             {
-                Merged.back().Prob += FAtom.Prob;
+                Merged.back().Prob += TAtom.Prob;
             }
             else
             {
-                Merged.push_back(FAtom);
+                Merged.push_back(TAtom);
             }
         }
 
@@ -99,7 +105,7 @@ template<typename ProbType, typename ValueType> struct TDist
     {
         PDF.erase(std::remove_if(PDF.begin(),
                                  PDF.end(),
-                                 [](const FAtom<ProbType, ValueType>& p)
+                                 [](const TAtom<ProbType, ValueType>& p)
                                  { return p.Prob == 0; }),
                   PDF.end());
     }
@@ -108,7 +114,7 @@ template<typename ProbType, typename ValueType> struct TDist
     {
         PDF.erase(std::remove_if(PDF.begin(),
                                  PDF.end(),
-                                 [eps](const FAtom<ProbType, ValueType>& p)
+                                 [eps](const TAtom<ProbType, ValueType>& p)
                                  { return abs(p.Prob) < eps; }),
                   PDF.end());
     }
@@ -126,11 +132,11 @@ template<typename ProbType, typename ValueType> struct TDist
         std::invoke_result_t<F, ValueType> result{};
         for (const auto& x : PDF)
         {
-            auto   fx = f(x.Value);
+            auto fx = f(x.Value);
             double Prob = x.Prob;
             for (auto& r : fx.PDF)
             {
-                result.PDF.push_back(FAtom{ r.Value, Prob * r.Prob });
+                result.PDF.push_back(TAtom{ r.Value, Prob * r.Prob });
             }
         }
 
@@ -147,7 +153,7 @@ template<typename ProbType, typename ValueType> struct TDist
         for (const auto& x : PDF)
         {
             auto fx = f(x.Value);
-            result.PDF.push_back(FAtom{ fx, x.Prob });
+            result.PDF.push_back(TAtom{ fx, x.Prob });
         }
 
         result.canonicalise();
@@ -181,33 +187,27 @@ template<typename ProbType, typename ValueType> struct TDist
         }
     }
 
-    const std::vector<FAtom<ProbType, ValueType>>& GetPDF() const
+    const std::vector<TAtom<ProbType, ValueType>>& GetPDF() const
     {
         return PDF;
     }
 
-    auto begin() const
-    {
-        return PDF.begin();
-    }
+    auto begin() const { return PDF.begin(); }
 
-    auto end() const
-    {
-        return PDF.end();
-    }
+    auto end() const { return PDF.end(); }
 
-    std::vector<FAtom<ProbType, ValueType>> PDF;
+    std::vector<TAtom<ProbType, ValueType>> PDF;
 };
 
 template<typename ProbType, typename T, typename U>
-TDist<ProbType, AddResultType<T, U>> operator+(const T&                  t,
+TDist<ProbType, AddResultType<T, U>> operator+(const T& t,
                                                const TDist<ProbType, U>& du)
 {
     return du.Transform([t](const U& u) { return t + u; });
 }
 
 template<typename ProbType, typename T, typename U>
-TDist<ProbType, TimesResultType<T, U>> operator*(const T&                  t,
+TDist<ProbType, TimesResultType<T, U>> operator*(const T& t,
                                                  const TDist<ProbType, U>& du)
 {
     return du.Transform([t](const U& u) { return t * u; });
@@ -216,30 +216,30 @@ TDist<ProbType, TimesResultType<T, U>> operator*(const T&                  t,
 template<typename X> using TDDist = TDist<double, X>;
 
 template<typename ProbType = double, typename T>
-std::ostream& operator<<(std::ostream& os, const FAtom<ProbType, T>& FAtom)
+std::ostream& operator<<(std::ostream& os, const TAtom<ProbType, T>& TAtom)
 {
-    os << "FAtom(Value: " << FAtom.Value << ", Prob: " << FAtom.Prob << ")";
+    os << "TAtom(Value: " << TAtom.Value << ", Prob: " << TAtom.Prob << ")";
     return os;
 }
 
 template<typename ProbType = double, typename T>
-void SortAndCombine(std::vector<FAtom<ProbType, T>>& atoms)
+void SortAndCombine(std::vector<TAtom<ProbType, T>>& atoms)
 {
     std::sort(atoms.begin(),
               atoms.end(),
-              [](const FAtom<ProbType, T>& a, const FAtom<ProbType, T>& b)
+              [](const TAtom<ProbType, T>& a, const TAtom<ProbType, T>& b)
               { return a.Value < b.Value; });
 
-    std::vector<FAtom<ProbType, T>> combined;
-    for (const auto& FAtom : atoms)
+    std::vector<TAtom<ProbType, T>> combined;
+    for (const auto& TAtom : atoms)
     {
-        if (!combined.empty() && combined.back().Value == FAtom.Value)
+        if (!combined.empty() && combined.back().Value == TAtom.Value)
         {
-            combined.back().Prob += FAtom.Prob;
+            combined.back().Prob += TAtom.Prob;
         }
         else
         {
-            combined.push_back(FAtom);
+            combined.push_back(TAtom);
         }
     }
 
